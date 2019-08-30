@@ -98,7 +98,7 @@ def main():
 	lmpc.xOpt    = xOpt
 
 	# Save the lmpc object
-	filename = 'lmpc_object'
+	filename = 'lmpc_object.pkl'
 	filehandler = open(filename, 'w')
 	pickle.dump(lmpc, filehandler)
 

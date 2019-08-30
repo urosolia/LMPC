@@ -1,7 +1,7 @@
 # Start from anaconda image
 FROM continuumio/anaconda:latest
 
-# Install python dev libraries
+# Install python dev and latex libraries
 RUN apt update
 RUN apt install -y python-dev texlive-fonts-recommended texlive-fonts-extra dvipng
 

@@ -8,10 +8,10 @@ import copy
 import pickle
 import pdb
 from matplotlib import rc
-rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+# rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=True)
 
-filehandler = open('lmpc_object', 'r')
+filehandler = open('lmpc_object.pkl', 'r')
 lmpc = pickle.load(filehandler)
 
 
