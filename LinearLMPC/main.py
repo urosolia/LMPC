@@ -2,6 +2,8 @@ import numpy as np
 from FTOCP import FTOCP
 from LMPC import LMPC
 import pdb
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import copy
 import pickle
@@ -14,7 +16,7 @@ def main():
 	R = 1.0#np.array([[1]])
 
 	# Initial Condition
-	x0 = [-10.0, 1];  
+	x0 = [-10.0, 1];
 
 	# Initialize FTOCP object
 	N_feas = 10
@@ -42,10 +44,10 @@ def main():
 	print np.round(np.array(xcl_feasible).T, decimals=2)
 	print np.round(np.array(ucl_feasible).T, decimals=2)
 	# ====================================================================================
-	
+
 
 	# ====================================================================================
-	# Run LMPC 
+	# Run LMPC
 	# ====================================================================================
 
 	# Initialize LMPC object
@@ -97,7 +99,7 @@ def main():
 
 	# Save the lmpc object
 	filename = 'lmpc_object'
-	filehandler = open(filename, 'w') 
+	filehandler = open(filename, 'w')
 	pickle.dump(lmpc, filehandler)
 
 if __name__== "__main__":

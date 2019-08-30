@@ -1,13 +1,15 @@
-import numpy as np 
+import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import copy
 import pickle
 import pdb
-from matplotlib import rc
-rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-rc('text', usetex=True)
+# from matplotlib import rc
+# rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+# rc('text', usetex=True)
 
-filehandler = open('lmpc_object', 'r') 
+filehandler = open('lmpc_object', 'r')
 lmpc = pickle.load(filehandler)
 
 
