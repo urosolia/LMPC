@@ -41,7 +41,7 @@ class FTOCP(object):
 		u = Variable((self.d, self.N))
 
 		# If SS is given construct a matrix collacting all states and a vector collection all costs
-		if SS != None:
+		if SS is not None:
 			SS_vector = np.squeeze(list(itertools.chain.from_iterable(SS))).T # From a 3D list to a 2D array
 			Qfun_vector = np.expand_dims(np.array(list(itertools.chain.from_iterable(Qfun))), 0) # From a 2D list to a 1D array
 			if CVX == True:
@@ -59,7 +59,7 @@ class FTOCP(object):
 						x[:,i] <=  10.0,]
 
 		# Terminal Constraint if SS not empty
-		if SS != None:
+		if SS is not None:
 			constr += [SS_vector * lambVar[:,0] == x[:,self.N], # Terminal state \in ConvHull(SS)
 						np.ones((1, SS_vector.shape[1])) * lambVar[:,0] == 1, # Multiplies \lambda sum to 1
 						lambVar >= 0] # Multiplier are positive definite
@@ -70,7 +70,7 @@ class FTOCP(object):
 			cost += norm(self.Q**0.5*x[:,i])**2 + norm(self.R**0.5*u[:,i])**2 # Running cost h(x,u) = x^TQx + u^TRu
 
 		# Terminal cost if SS not empty
-		if SS != None:
+		if SS is not None:
 			cost += Qfun_vector[0,:] * lambVar[:,0]  # It terminal cost is given by interpolation using \lambda
 		else:
 			cost += norm(self.Q**0.5*x[:,self.N])**2 # If SS is not given terminal cost is quadratic
