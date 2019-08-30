@@ -1,9 +1,9 @@
 # Start from anaconda image
 FROM continuumio/anaconda:latest
 
-# Install python dev libraries
+# Install python dev and latex libraries
 RUN apt update
-RUN apt install -y python-dev
+RUN apt install -y python-dev texlive-fonts-recommended texlive-fonts-extra dvipng
 
 # Set display environment variable
 ENV QT_X11_NO_MITSHM=1
@@ -16,6 +16,10 @@ WORKDIR /home/LMPC
 RUN /opt/conda/bin/conda install -c anaconda jupyter tk -y
 # Install cvxpy and ipopt
 RUN /opt/conda/bin/conda install -c conda-forge cyipopt cvxpy -y
+
+# Delete matplotlib font cache so we can rebuild it later
+RUN fc-cache -f -v
+RUN rm -rf /root/.cache/matplotlib
 
 # Two options for command to run
 

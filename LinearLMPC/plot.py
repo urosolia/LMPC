@@ -1,15 +1,17 @@
 import numpy as np
 import matplotlib
 matplotlib.use('TkAgg')
+import matplotlib.font_manager
+matplotlib.font_manager._rebuild()
 import matplotlib.pyplot as plt
 import copy
 import pickle
 import pdb
-# from matplotlib import rc
+from matplotlib import rc
 # rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-# rc('text', usetex=True)
+rc('text', usetex=True)
 
-filehandler = open('lmpc_object', 'r')
+filehandler = open('lmpc_object.pkl', 'r')
 lmpc = pickle.load(filehandler)
 
 
@@ -50,7 +52,6 @@ plt.plot([0, it-1], [lmpc.optCost, lmpc.optCost], '--k', label='Optimal cost')
 plt.xlabel('$\mathrm{Iteration}$', fontsize=20)
 plt.legend()
 
-
-print "Percentage deviotion: ", np.abs((lmpc.optCost-totCost[-1])/lmpc.optCost)*100
+print "Percentage deviation: ", np.abs((lmpc.optCost-totCost[-1])/lmpc.optCost)*100
 
 plt.show()
