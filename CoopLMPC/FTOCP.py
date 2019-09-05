@@ -33,9 +33,13 @@ class FTOCP(object):
 		self.Q = Q
 		self.R = R
 
-		# Initialize Predicted Trajectory
-		self.xPred = []
-		self.uPred = []
+	def stage_cost_fun(self, x, xf, u):
+		# Using the cvxpy norm function here
+		return norm(self.Q**0.5*(x-xf))**2 + norm(self.R**0.5*u)**2
+
+	def term_cost_fun(self, x, xf):
+		# Using the cvxpy norm function here
+		return norm(self.Q**0.5*(x-xf))**2
 
 	def solve(self, x0, xf=None, verbose=False, SS=None, Qfun=None, CVX=False):
 		"""This methos solve a FTOCP given:
@@ -85,31 +89,25 @@ class FTOCP(object):
 		# Cost Function
 		cost = 0
 		for i in range(0, self.N):
-			cost += norm(self.Q**0.5*(x[:,i]-xf))**2 + norm(self.R**0.5*u[:,i])**2 # Running cost h(x,u) = x^TQx + u^TRu
+			cost += self.stage_cost_fun(x[:,i], xf, u[:,i])
+			# cost += norm(self.Q**0.5*(x[:,i]-xf))**2 + norm(self.R**0.5*u[:,i])**2 # Running cost h(x,u) = x^TQx + u^TRu
 
 		# Terminal cost if SS not empty
 		if SS is not None:
 			cost += Qfun_vector[0,:] * lambVar[:,0]  # It terminal cost is given by interpolation using \lambda
 		else:
-			cost += norm(self.Q**0.5*(x[:,self.N]-xf))**2 # If SS is not given terminal cost is quadratic
+			cost += self.term_cost_fun(x[:,self.N], xf)
+			# cost += norm(self.Q**0.5*(x[:,self.N]-xf))**2 # If SS is not given terminal cost is quadratic
 
 		# Solve the Finite Time Optimal Control Problem
 		problem = Problem(Minimize(cost), constr)
-		problem.solve(verbose=verbose==1)
+		problem.solve(verbose=verbose)
 
-		# Store the open-loop predicted trajectory
-		self.xPred = x.value
-		self.uPred = u.value
+		return(x.value, u.value)
 
 	def model(self, x, u):
 		# Compute state evolution
 		return self.A.dot(x) + self.B.dot(u)
-
-	def get_u_opt(self):
-		return self.uPred
-
-	def get_x_opt(self):
-		return self.xPred
 
 	def update_system(self, A=None, B=None):
 		if A is not None:

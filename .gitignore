@@ -1,3 +1,5 @@
 *.pyc
 *.pkl
+*.ipynb
+.ipynb_checkpoints
 Notebooks
