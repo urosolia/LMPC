@@ -38,25 +38,26 @@ class LMPC(object):
 		# Augment iteration counter and print the cost of the trajectories stored in the safe set
 		self.it = self.it + 1
 		print "Trajectory added to the Safe Set. Current Iteration: ", self.it
-		print "Performance stored trajectories: \n", [self.Qfun[i][0] for i in range(self.it)]
+		print "Performance of stored trajectories: \n", [self.Qfun[i][0] for i in range(self.it)]
+
+		return cost
 
 	def computeCost(self, x, u, xf):
 		l = x.shape[1]
 		# Compute the cost in a DP like strategy: start from the last point x[len(x)-1] and move backwards
-		for i in range(l):
-			idx = l-1-i
-			if i == 0: # Terminal cost
+		for t in range(l-1,-1,-1):
+			if t == l-1: # Terminal cost
 				# cost = [np.dot(np.dot(x[:,idx],self.Q),x[:,idx])]
-				cost = [self.ftocp.term_cost_fun(x[:,idx], xf).value]
+				cost = [la.norm((self.Q**0.5).dot(x[:,t]-xf),ord=2)**2]
 			else:
 				# cost.append(np.dot(np.dot(x[:,idx],self.Q),x[:,idx]) + np.dot(np.dot(u[:,idx],self.R),u[:,idx]) + cost[-1])
-				cost.append(self.ftocp.stage_cost_fun(x[:,idx], xf, u[:,idx]).value + cost[-1])
+				cost.append(la.norm((self.Q**0.5).dot(x[:,t]-xf),ord=2)**2 + la.norm((self.R**0.5).dot(u[:,t]),ord=2)**2 + 1 + cost[-1])
 		# Finally flip the cost to have correct order
 		return np.flip(cost).tolist()
 
-	def solve(self, xt, xf=None, verbose=True):
+	def solve(self, xt, xf=None, abs_t=None, deltas=None, verbose=True):
 		# Solve the FTOCP. Here set terminal constraint = ConvHull(self.SS) and terminal cost = BarycentricInterpolation(self.Qfun)
-		return self.ftocp.solve(xt, xf, verbose, self.SS, self.Qfun, self.CVX)
+		return self.ftocp.solve(xt, xf, abs_t, deltas, self.SS, self.Qfun, self.CVX, verbose)
 
 	def get_safe_set_q_func(self):
 		return (self.SS, self.uSS, self.Qfun)
