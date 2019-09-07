@@ -50,7 +50,6 @@ class FTOCP(object):
 			- Qfun: (optional) cost associtated with the state stored in SS. Terminal cost is BarycentrcInterpolation(SS, Qfun)
 			- CVX: (optional)
 		"""
-
 		if xf is None:
 			xf = np.zeros(self.n)
 		else:
@@ -96,7 +95,8 @@ class FTOCP(object):
 				if abs_t is None:
 					raise(ValueError('Absolute time step must be given'))
 				t = min(abs_t+i, SS_vector.shape[1]-1)
-				constr += [cp.norm(x[:,i]-SS_vector[:,t])**2 <= deltas[t]**2]
+				constr += [cp.norm_inf(x[:2,i]-SS_vector[:2,t]) <= deltas[t]]
+				# constr += [cp.norm(x[:2,i]-SS_vector[:2,t], p=2)**2 <= deltas[t]**2]
 
 		# Terminal Constraint if SS not empty
 		if SS is not None:
@@ -105,12 +105,16 @@ class FTOCP(object):
 						lambVar >= 0] # Multiplier are positive definite
 			if deltas is not None:
 				t = min(abs_t+self.N, SS_vector.shape[1]-1)
-				constr += [cp.norm(x[:,self.N]-SS_vector[:,t])**2 <= deltas[t]**2]
+				constr += [cp.norm_inf(x[:2,self.N]-SS_vector[:2,t]) <= deltas[t]]
+				# constr += [cp.norm(x[:2,self.N]-SS_vector[:2,t], p=2)**2 <= deltas[t]**2]
 
 		# Cost Function
 		cost = 0
 		for i in range(0, self.N):
-			cost += cp.norm(self.Q**0.5*(x[:,i]-xf))**2 + cp.norm(self.R**0.5*u[:,i])**2
+			if SS is not None:
+				cost += 10*x[1,i]**2 + cp.norm(self.R**0.5*u[:,i])**2
+			else:
+				cost += cp.norm(self.Q**0.5*(x[:,i]-xf))**2 + cp.norm(self.R**0.5*u[:,i])**2
 			# cost += self.stage_cost_fun(x[:,i], xf, u[:,i])
 
 			if not CVX:

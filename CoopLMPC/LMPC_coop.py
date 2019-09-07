@@ -47,11 +47,11 @@ class LMPC(object):
 		# Compute the cost in a DP like strategy: start from the last point x[len(x)-1] and move backwards
 		for t in range(l-1,-1,-1):
 			if t == l-1: # Terminal cost
-				# cost = [np.dot(np.dot(x[:,idx],self.Q),x[:,idx])]
-				cost = [la.norm((self.Q**0.5).dot(x[:,t]-xf),ord=2)**2]
+				# cost = [la.norm((self.Q**0.5).dot(x[:,t]-xf),ord=2)**2]
+				cost = [10*x[1,t]**2]
 			else:
-				# cost.append(np.dot(np.dot(x[:,idx],self.Q),x[:,idx]) + np.dot(np.dot(u[:,idx],self.R),u[:,idx]) + cost[-1])
-				cost.append(la.norm((self.Q**0.5).dot(x[:,t]-xf),ord=2)**2 + la.norm((self.R**0.5).dot(u[:,t]),ord=2)**2 + 1 + cost[-1])
+				# cost.append(la.norm((self.Q**0.5).dot(x[:,t]-xf),ord=2)**2 + la.norm((self.R**0.5).dot(u[:,t]),ord=2)**2 + 1 + cost[-1])
+				cost.append(10*x[1,t]**2 + u[:,t].T.dot(self.R).dot(u[:,t]) + 1 + cost[-1])
 		# Finally flip the cost to have correct order
 		return np.flip(cost).tolist()
 

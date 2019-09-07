@@ -22,7 +22,7 @@ def init_traj(ftocp, x0, waypt, xf):
 	n_u = ftocp.d
 
 	xcl_feas = x0
-	ucl_feas = np.empty((n_u,1))
+	ucl_feas = np.empty((n_u,0))
 
 	mode = 1
 	t = 0
@@ -45,7 +45,7 @@ def init_traj(ftocp, x0, waypt, xf):
 		ucl_feas = np.append(ucl_feas, ut, axis=1)
 		xcl_feas = np.append(xcl_feas, xtp1, axis=1)
 
-		print('Time step: %i, Distance: %g' % (t, la.norm(xtp1-xf.reshape((n_x,1)), ord=2)))
+		# print('Time step: %i, Distance: %g' % (t, la.norm(xtp1-xf.reshape((n_x,1)), ord=2)))
 		if la.norm(xtp1-xg.reshape((n_x,1)), ord=2)**2 <= 10**(-tol):
 			if mode == 1:
 				mode += 1
@@ -61,7 +61,7 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False):
 	n_u = lmpc.ftocp.d
 
 	xcl = x0 # initialize system state at interation it
-	ucl = np.empty((n_u,1))
+	ucl = np.empty((n_u,0))
 	tol = 10
 
 	t = 0
@@ -73,10 +73,11 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False):
 		# Read input and apply it to the system
 		ut = u_pred[:,0].reshape((n_u, 1))
 		xtp1 = lmpc.ftocp.model(xt.reshape((n_x, 1)), ut)
+
 		ucl = np.append(ucl, ut, axis=1)
 		xcl = np.append(xcl, xtp1, axis=1)
 
-		print('Time step: %i, Distance: %g' % (t, la.norm(xtp1-xf.reshape((n_x,1)), ord=2)))
+		# print('Time step: %i, Distance: %g' % (t, la.norm(xtp1-xf.reshape((n_x,1)), ord=2)))
 		if la.norm(xtp1-xf.reshape((n_x,1)), ord=2)**2 <= 10**(-tol):
 			break
 
@@ -85,7 +86,6 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False):
 	# print np.round(np.array(xcl).T, decimals=2) # Uncomment to print trajectory
 	# Add trajectory to update the safe set and value function
 	# lmpc.addTrajectory(xcl, ucl)
-
 	return xcl, ucl
 
 def get_traj_deltas(agent_xcls, xf, r_a=0):
@@ -103,28 +103,29 @@ def get_traj_deltas(agent_xcls, xf, r_a=0):
 
 	# Solve for pair-wise distances between trajectory points for each agent at each time step
 	for i in range(max_traj_len):
-		r = cp.Variable(n_a)
+		d = cp.Variable(n_a)
 		pairs = map(list, itertools.combinations(range(n_a), 2))
 
 		# Constraints
-		constr = [r >= 0]
+		constr = [d >= 0]
 		for p in pairs:
 			# r_i+r_j <= ||x_i-x_j||_2
-			constr += [r[p[0]]+r[p[1]] <= la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i])-2*r_a]
+			constr += [d[p[0]]+d[p[1]] <= la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i], ord=2)-2*r_a]
+			# constr += [d[p[0]]+d[p[1]] <= la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i], ord=np.inf)-2*r_a]
 
 		# Cost
 		if n_a == 2:
 			w = np.array([min(i+1,traj_lens[j]) for j in range(n_a)])
 		else:
-			w = np.array([la.norm(agent_xcls[j][:2,i]-xf[j][:2]) for j in range(n_a)])
-		cost = w*r
+			w = np.array([la.norm(agent_xcls[j][:2,i]-xf[j][:2], ord=2) for j in range(n_a)])
+		cost = w*d
 
 		problem = cp.Problem(cp.Maximize(cost), constr)
 		problem.solve(verbose=False)
 
-		r_val = r.value
+		d_val = d.value
 
-		deltas.append(r_val)
+		deltas.append(d_val)
 
 	deltas = np.array(deltas).T
 
@@ -162,11 +163,11 @@ def main():
 	# Initial Condition
 	x0 = [np.nan*np.ones((n_x, 1)) for _ in range(n_a)]
 	x0[0] = np.array([[0, 0, 0, 0]]).T
-	x0[1] = np.array([[1, 0, 0, 0]]).T
+	x0[1] = np.array([[2, 0, 0, 0]]).T
 
 	# Goal condition
 	xf = [np.nan*np.ones((n_x, 1)) for _ in range(n_a)]
-	xf[0] = np.array([[2, 0, 0, 0]]).T
+	xf[0] = np.array([[1, 0, 0, 0]]).T
 	xf[1] = np.array([[-1, 0, 0, 0]]).T
 
 	# Check to make sure all agent dynamics, inital, and goal states have been defined
@@ -230,7 +231,7 @@ def main():
 	# ====================================================================================
 
 	# Initialize LMPC objects for each agent
-	N_LMPC = [4, 4] # horizon lengths
+	N_LMPC = [6, 6] # horizon lengths
 	ftocp_for_lmpc = [FTOCP(N_LMPC[i], A[i], B[i], Q, R, Hx=Hx, gx=gx, Hu=Hu, gu=gu) for i in range(n_a)]# ftocp solve by LMPC
 	lmpc = [LMPC(f, CVX=False) for f in ftocp_for_lmpc]# Initialize the LMPC decide if you wanna use the CVX hull
 	for i in range(n_a):
@@ -242,20 +243,25 @@ def main():
 
 	# Initialize objective value plot
 	# obj_plot = plot_utils.updateable_plot(n_a, title='Agent Trajectory Costs', x_label='Iteration')
-	totalIterations = 2 # Number of iterations to perform
+	totalIterations = 20 # Number of iterations to perform
+	start_time = str(time.time())
+	os.makedirs('/'.join((plot_dir, start_time)))
 
 	# run simulation
 	# iteration loop
 	for it in range(totalIterations):
 		deltas = get_traj_deltas(xcls[-1], xf, r_a=r_a) # Compute deltas with last trajectory
-		if it == 0:
-			traj_plot = plot_utils.plot_agent_trajs(xcls[-1], r=r_a, trail=True)
-		else:
-			plot_utils.plot_agent_trajs(xcls[-1], r=r_a, trail=True, fig=traj_plot)
+		# if it == 0:
+		# 	traj_fig = plot_utils.plot_agent_trajs(xcls[-1], r=0, trail=True)
+		# else:
+		# 	plot_utils.plot_agent_trajs(xcls[-1], r=0, trail=True, fig=traj_fig)
+		f = plot_utils.plot_agent_trajs(xcls[-1], r=r_a, trail=True)
+		f.savefig('/'.join((plot_dir, start_time, 'it_%i_trajs.png' % it)))
 
 		x_it = []
 		u_it = []
 		for i in range(n_a):
+			print('Agent %i' % (i+1))
 			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], deltas[i,:])
 			opt_cost = lmpc[i].addTrajectory(xcl, ucl)
 			# obj_plot.update(np.array([it, opt_cost]).T, i)
