@@ -45,7 +45,8 @@ class FTOCP(object):
 		"""This methos solve a FTOCP given:
 			- x0: initial condition
 			- xf: (optional) goal condition, defaults to the origin
-			- deltas: (optional) allowed deviation from previous trajectory
+			- abs_t: (required if deltas is provided) absolute time step
+			- deltas: (optional) allowed deviations from previous trajectory
 			- SS: (optional) contains a set of state and the terminal constraint is ConvHull(SS)
 			- Qfun: (optional) cost associtated with the state stored in SS. Terminal cost is BarycentrcInterpolation(SS, Qfun)
 			- CVX: (optional)
@@ -70,16 +71,13 @@ class FTOCP(object):
 				lambVar = cp.Variable((SS_vector.shape[1], 1), boolean=False) # Initialize vector of variables
 			else:
 				lambVar = cp.Variable((SS_vector.shape[1], 1), boolean=True) # Initialize vector of variables
-				gamVar = cp.Variable((self.N), boolean=True)
+				gamVar = cp.Variable((self.N+1), boolean=True)
 
-		M = 1000 # Big M multiplier
+		if not CVX:
+			M = 1000 # Big M multiplier
+
 		constr = [x[:,0] == x0] # Initial condition
 		for i in range(self.N):
-			# constr += [x[:,i+1] == self.A*x[:,i] + self.B*u[:,i],
-			# 			u[:,i] >= -1.0,
-			# 			u[:,i] <=  1.0,
-			# 			x[:,i] >= -10.0,
-			# 			x[:,i] <=  10.0,]
 			constr += [x[:,i+1] == self.A*x[:,i] + self.B*u[:,i]] # Dynamics
 
 			if self.Hx is not None:
@@ -88,45 +86,52 @@ class FTOCP(object):
 				constr += [self.Hu*u[:,i] <= self.gu] # Input constraints
 
 			if not CVX:
+				# Big M reformulation of minimum time objective: \gamma = 1 when x has not reached x_f, \gamma = 0 when x has reached x_f
 				bigM_ub = xf+M*np.ones(self.n)*gamVar[i]
 				bigM_lb = xf-M*np.ones(self.n)*gamVar[i]
 				constr += [x[:,i] <= bigM_ub, -x[:,i] <= -bigM_lb]
 			if deltas is not None:
+				# Constrain positions to be within mutual agreed deviations at each time step
 				if abs_t is None:
 					raise(ValueError('Absolute time step must be given'))
 				t = min(abs_t+i, SS_vector.shape[1]-1)
-				constr += [cp.norm_inf(x[:2,i]-SS_vector[:2,t]) <= deltas[t]]
-				# constr += [cp.norm(x[:2,i]-SS_vector[:2,t], p=2)**2 <= deltas[t]**2]
+				# constr += [cp.norm_inf(x[:2,i]-SS_vector[:2,t]) <= deltas[t]]
+				constr += [cp.quad_form(x[:2,i]-SS_vector[:2,t], np.eye(2)) <= deltas[t]**2]
 
 		# Terminal Constraint if SS not empty
 		if SS is not None:
-			constr += [SS_vector * lambVar[:,0] == x[:,self.N], # Terminal state \in ConvHull(SS)
-						np.ones((1, SS_vector.shape[1])) * lambVar[:,0] == 1, # Multiplies \lambda sum to 1
-						lambVar >= 0] # Multiplier are positive definite
+			# Terminal state \in ConvHull(SS) or if \lambda is boolean, then terminal state is one of the points in the SS
+			constr += [SS_vector * lambVar[:,0] == x[:,self.N],
+						np.ones((1, SS_vector.shape[1])) * lambVar[:,0] == 1, # \lambda sum to 1 or only 1 \lambda is equal to 1
+						lambVar >= 0] # Multipliers are positive definite
+			if not CVX:
+				bigM_ub = xf+M*np.ones(self.n)*gamVar[self.N]
+				bigM_lb = xf-M*np.ones(self.n)*gamVar[self.N]
+				constr += [x[:,self.N] <= bigM_ub, -x[:,self.N] <= -bigM_lb]
 			if deltas is not None:
+				# Constrain last position to be within mutual agreed deviations
 				t = min(abs_t+self.N, SS_vector.shape[1]-1)
-				constr += [cp.norm_inf(x[:2,self.N]-SS_vector[:2,t]) <= deltas[t]]
+				# constr += [cp.norm_inf(x[:2,self.N]-SS_vector[:2,t]) <= deltas[t]]
 				# constr += [cp.norm(x[:2,self.N]-SS_vector[:2,t], p=2)**2 <= deltas[t]**2]
+				constr += [cp.quad_form(x[:2,self.N]-SS_vector[:2,t], np.eye(2)) <= deltas[t]**2]
 
 		# Cost Function
 		cost = 0
-		for i in range(0, self.N):
+		for i in range(self.N):
 			if SS is not None:
-				cost += 10*x[1,i]**2 + cp.norm(self.R**0.5*u[:,i])**2
+				cost += 10*x[1,i]**2 + cp.quad_form(u[:,i], self.R)
 			else:
-				cost += cp.norm(self.Q**0.5*(x[:,i]-xf))**2 + cp.norm(self.R**0.5*u[:,i])**2
-			# cost += self.stage_cost_fun(x[:,i], xf, u[:,i])
-
+				cost += cp.quad_form(x[:,i]-xf, self.Q) + cp.quad_form(u[:,i], self.R) # Running cost h(x,u) = x^TQx + u^TRu
 			if not CVX:
 				cost += gamVar[i]
-			# cost += norm(self.Q**0.5*(x[:,i]-xf))**2 + norm(self.R**0.5*u[:,i])**2 # Running cost h(x,u) = x^TQx + u^TRu
 
 		# Terminal cost if SS not empty
 		if SS is not None:
 			cost += Qfun_vector * lambVar[:,0]  # It terminal cost is given by interpolation using \lambda
 		else:
-			cost += cp.norm(self.Q**0.5*(x[:,self.N]-xf))**2 # If SS is not given terminal cost is quadratic
-			# cost += self.term_cost_fun(x[:,self.N], xf.reshape(self.n))
+			cost += cp.quad_form(x[:,self.N]-xf, self.Q)
+		# if not CVX:
+		# 	cost += gamVar[self.N]
 
 		# Solve the Finite Time Optimal Control Problem
 		problem = cp.Problem(cp.Minimize(cost), constr)
@@ -143,7 +148,7 @@ class FTOCP(object):
 		# Compute state evolution
 		return self.A.dot(x) + self.B.dot(u)
 
-	def update_system(self, A=None, B=None):
+	def update_model(self, A=None, B=None):
 		if A is not None:
 			self.A = A
 		if B is not None:

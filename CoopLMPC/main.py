@@ -17,25 +17,25 @@ from FTOCP_coop import FTOCP
 from LMPC_coop import LMPC
 import plot_utils
 
-def init_traj(ftocp, x0, waypt, xf):
+def solve_init_traj(ftocp, x0, waypt, xf):
 	n_x = ftocp.n
 	n_u = ftocp.d
 
 	xcl_feas = x0
 	ucl_feas = np.empty((n_u,0))
 
-	mode = 1
+	mode = 0
 	t = 0
 	# time Loop (Perform the task until close to the origin)
 	while True:
 		xt = xcl_feas[:,t] # Read measurements
 
-		if mode == 1:
+		if mode == 0:
 			xg = waypt.reshape((n_x))
 			tol = 0
 		else:
 			xg = xf.reshape((n_x))
-			tol = 10
+			tol = 5
 
 		(x_pred, u_pred) = ftocp.solve(xt, xf=xg, CVX=True, verbose=False) # Solve FTOCP
 
@@ -46,11 +46,11 @@ def init_traj(ftocp, x0, waypt, xf):
 		xcl_feas = np.append(xcl_feas, xtp1, axis=1)
 
 		# print('Time step: %i, Distance: %g' % (t, la.norm(xtp1-xf.reshape((n_x,1)), ord=2)))
-		if la.norm(xtp1-xg.reshape((n_x,1)), ord=2)**2 <= 10**(-tol):
+		# Close within tolerance
+		if la.norm(xtp1-xg.reshape((n_x,1)), ord=2) <= 10**(-tol):
 			if mode == 1:
-				mode += 1
-			else:
 				break
+			mode += 1
 
 		t += 1
 
@@ -62,7 +62,7 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False):
 
 	xcl = x0 # initialize system state at interation it
 	ucl = np.empty((n_u,0))
-	tol = 10
+	tol = 5
 
 	t = 0
 	# time Loop (Perform the task until close to the origin)
@@ -78,7 +78,7 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False):
 		xcl = np.append(xcl, xtp1, axis=1)
 
 		# print('Time step: %i, Distance: %g' % (t, la.norm(xtp1-xf.reshape((n_x,1)), ord=2)))
-		if la.norm(xtp1-xf.reshape((n_x,1)), ord=2)**2 <= 10**(-tol):
+		if la.norm(xtp1-xf.reshape((n_x,1)), ord=2) <= 10**(-tol):
 			break
 
 		t += 1
@@ -103,6 +103,7 @@ def get_traj_deltas(agent_xcls, xf, r_a=0):
 
 	# Solve for pair-wise distances between trajectory points for each agent at each time step
 	for i in range(max_traj_len):
+		# print('Timestep %i' % i)
 		d = cp.Variable(n_a)
 		pairs = map(list, itertools.combinations(range(n_a), 2))
 
@@ -110,6 +111,7 @@ def get_traj_deltas(agent_xcls, xf, r_a=0):
 		constr = [d >= 0]
 		for p in pairs:
 			# r_i+r_j <= ||x_i-x_j||_2
+			# print('d[%i] + d[%i] <= %g' % (p[0], p[1], la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i], ord=2)-2*r_a))
 			constr += [d[p[0]]+d[p[1]] <= la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i], ord=2)-2*r_a]
 			# constr += [d[p[0]]+d[p[1]] <= la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i], ord=np.inf)-2*r_a]
 
@@ -121,11 +123,17 @@ def get_traj_deltas(agent_xcls, xf, r_a=0):
 		cost = w*d
 
 		problem = cp.Problem(cp.Maximize(cost), constr)
-		problem.solve(verbose=False)
+		try:
+		    problem.solve()
+		except Exception as e:
+		    print(e)
 
-		d_val = d.value
+		if problem.status == 'infeasible':
+			raise(ValueError('Optimization was infeasible for step %i' % i))
+		elif problem.status == 'unbounded':
+			raise(ValueError('Optimization was unbounded for step %i' % i))
 
-		deltas.append(d_val)
+		deltas.append(d.value)
 
 	deltas = np.array(deltas).T
 
@@ -202,7 +210,7 @@ def main():
 		# Create threads
 		pool = mp.Pool(processes=n_a)
 		# Assign thread to agent trajectory
-		results = [pool.apply_async(init_traj, args=(ftocp[i], x0[i], waypt[i], xf[i])) for i in range(n_a)]
+		results = [pool.apply_async(solve_init_traj, args=(ftocp[i], x0[i], waypt[i], xf[i])) for i in range(n_a)]
 		# Sync point
 		init_trajs = [r.get() for r in results]
 
@@ -211,7 +219,7 @@ def main():
 		ucl_feas = list(ucl_feas)
 	else:
 		for i in range(n_a):
-			(x, u) = init_traj(ftocp[i], x0[i], waypt[i], xf[i])
+			(x, u) = solve_init_traj(ftocp[i], x0[i], waypt[i], xf[i])
 			xcl_feas.append(x)
 			ucl_feas.append(u)
 	end = time.time()
@@ -220,7 +228,6 @@ def main():
 
 	if plot_init:
 		plot_utils.plot_agent_trajs(xcl_feas, r=r_a, trail=True)
-		# plt.show()
 
 	# ====================================================================================
 
@@ -240,17 +247,23 @@ def main():
 
 	xcls = [copy.copy(xcl_feas)]
 	ucls = [copy.copy(ucl_feas)]
+	delta_log = []
 
-	# Initialize objective value plot
-	# obj_plot = plot_utils.updateable_plot(n_a, title='Agent Trajectory Costs', x_label='Iteration')
 	totalIterations = 20 # Number of iterations to perform
 	start_time = str(time.time())
 	os.makedirs('/'.join((plot_dir, start_time)))
+
+	# Initialize objective value plot
+	# obj_plot = plot_utils.updateable_plot(n_a, title='Agent Trajectory Costs', x_label='Iteration')
+	delta_plot = plot_utils.updateable_ts(n_a, title='Deltas', x_label='Time', y_label=['Agent %i' % (i+1) for i in range(n_a)])
 
 	# run simulation
 	# iteration loop
 	for it in range(totalIterations):
 		deltas = get_traj_deltas(xcls[-1], xf, r_a=r_a) # Compute deltas with last trajectory
+		delta_log.append(deltas)
+		delta_plot.update(deltas)
+
 		# if it == 0:
 		# 	traj_fig = plot_utils.plot_agent_trajs(xcls[-1], r=0, trail=True)
 		# else:

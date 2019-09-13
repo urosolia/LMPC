@@ -93,3 +93,56 @@ class updateable_plot(object):
                 self.set_xlabel(self.y_label)
 
         self.fig.canvas.draw()
+
+class updateable_ts(object):
+    def __init__(self, n_seq, title=None, x_label=None, y_label=None):
+        plt.ion()
+        self.fig = plt.figure()
+        self.axs = [self.fig.add_subplot(n_seq, 1, i+1) for i in range(n_seq)]
+        for (i, a) in enumerate(self.axs):
+            if y_label is not None:
+                a.set_ylabel(y_label[i])
+            if title is not None and i == 0:
+                a.set_title(title)
+            if x_label is not None and i == len(self.axs)-1:
+                a.set_xlabel(x_label)
+
+        self.fig.canvas.draw()
+
+        self.n_seq = n_seq
+        self.title = title
+        self.x_label = x_label
+        self.y_label = y_label
+
+        # self.data = [np.empty((2,1)) for _ in range(n_seq)]
+        # self.c = [matplotlib.cm.get_cmap('jet')(i*(1./(n_seq-1))) for i in range(n_seq)]
+
+    def clear(self):
+        for a in self.axs:
+            a.clear()
+
+    def update(self, d):
+        t = range(d.shape[1])
+        for (i, a) in enumerate(self.axs):
+            a.plot(t, d[i,:])
+
+        self.fig.canvas.draw()
+
+# def plot_deltas(deltas):
+#     n_a = deltas[0].shape[0]
+#     n_d = len(deltas)
+#     self.c = [matplotlib.cm.get_cmap('jet')(i*(1./(n_d-1))) for i in range(n_d)]
+#     fig = plt.figure()
+#     axs = [plt.subplot(n_a, 1, i+1) for i in range(n_a)]
+#
+#     for (i, a) in enumerate(axs):
+#         a.set_ylabel('Agent %i' % (i+1))
+#         if i == 0:
+#             a.set_title('Deltas')
+#         if i == len(axs)-1:
+#             a.set_xlabel('Time')
+#
+#     for (i, d) in enumerate(deltas):
+#         t = range(d.shape[1])
+#         for (j, a) in enumerate(axs):
+#             a.plot(t, d[j,:], c=c[i])
