@@ -33,6 +33,9 @@ class FTOCP(object):
 		self.Q = Q
 		self.R = R
 
+		# FTOCP cost
+		self.costFTOCP = np.inf
+
 	# def stage_cost_fun(self, x, xf, u):
 	# 	# Using the cvxpy norm function here
 	# 	return cp.norm(self.Q**0.5*(x-xf))**2 + cp.norm(self.R**0.5*u)**2
@@ -60,18 +63,23 @@ class FTOCP(object):
 		x = cp.Variable((self.n, self.N+1))
 		u = cp.Variable((self.d, self.N))
 
-		# If SS is given construct a matrix collacting all states and a vector collection all costs
+		# If SS is given construct a matrix collecting all states and a vector collection all costs
 		if SS is not None:
 			# SS_vector = np.squeeze(list(itertools.chain.from_iterable(SS))).T # From a 3D list to a 2D array
 			# SS_vector = np.hstack(SS)
-			SS_vector = SS[-1] # Only use last trajectory
+			# SS_vector = SS[-1] # Only use last trajectory
+			SS_vector = SS[-1][:,abs_t:min(SS[-1].shape[1],abs_t+int(2*(self.N+1)))]
 			# Qfun_vector = np.expand_dims(np.array(list(itertools.chain.from_iterable(Qfun))), 0) # From a 2D list to a 1D array
-			Qfun_vector = np.array(Qfun[-1])
+			# Qfun_vector = np.array(Qfun[-1])
+			Qfun_vector = np.array(Qfun[-1][abs_t:abs_t+SS_vector.shape[1]])
 			if CVX:
 				lambVar = cp.Variable((SS_vector.shape[1], 1), boolean=False) # Initialize vector of variables
 			else:
 				lambVar = cp.Variable((SS_vector.shape[1], 1), boolean=True) # Initialize vector of variables
 				gamVar = cp.Variable((self.N+1), boolean=True)
+
+		if deltas is not None:
+			deltas = np.copy(deltas[abs_t:min(len(deltas),abs_t+int(2*(self.N+1)))])
 
 		if not CVX:
 			M = 1000 # Big M multiplier
@@ -94,9 +102,10 @@ class FTOCP(object):
 				# Constrain positions to be within mutual agreed deviations at each time step
 				if abs_t is None:
 					raise(ValueError('Absolute time step must be given'))
-				t = min(abs_t+i, SS_vector.shape[1]-1)
+				# t = min(abs_t+i, SS_vector.shape[1]-1)
 				# constr += [cp.norm_inf(x[:2,i]-SS_vector[:2,t]) <= deltas[t]]
-				constr += [cp.quad_form(x[:2,i]-SS_vector[:2,t], np.eye(2)) <= deltas[t]**2]
+				# constr += [cp.quad_form(x[:2,i]-SS_vector[:2,t], np.eye(2)) <= deltas[t]**2]
+				constr += [cp.quad_form(x[:2,i]-SS_vector[:2,min(i,SS_vector.shape[1]-1)], np.eye(2)) <= deltas[min(i,len(deltas)-1)]**2]
 
 		# Terminal Constraint if SS not empty
 		if SS is not None:
@@ -104,16 +113,17 @@ class FTOCP(object):
 			constr += [SS_vector * lambVar[:,0] == x[:,self.N],
 						np.ones((1, SS_vector.shape[1])) * lambVar[:,0] == 1, # \lambda sum to 1 or only 1 \lambda is equal to 1
 						lambVar >= 0] # Multipliers are positive definite
-			if not CVX:
-				bigM_ub = xf+M*np.ones(self.n)*gamVar[self.N]
-				bigM_lb = xf-M*np.ones(self.n)*gamVar[self.N]
-				constr += [x[:,self.N] <= bigM_ub, -x[:,self.N] <= -bigM_lb]
+			# if not CVX:
+			# 	bigM_ub = xf+M*np.ones(self.n)*gamVar[self.N]
+			# 	bigM_lb = xf-M*np.ones(self.n)*gamVar[self.N]
+			# 	constr += [x[:,self.N] <= bigM_ub, -x[:,self.N] <= -bigM_lb]
 			if deltas is not None:
 				# Constrain last position to be within mutual agreed deviations
-				t = min(abs_t+self.N, SS_vector.shape[1]-1)
+				# t = min(abs_t+self.N, SS_vector.shape[1]-1)
 				# constr += [cp.norm_inf(x[:2,self.N]-SS_vector[:2,t]) <= deltas[t]]
 				# constr += [cp.norm(x[:2,self.N]-SS_vector[:2,t], p=2)**2 <= deltas[t]**2]
-				constr += [cp.quad_form(x[:2,self.N]-SS_vector[:2,t], np.eye(2)) <= deltas[t]**2]
+				# constr += [cp.quad_form(x[:2,self.N]-SS_vector[:2,t], np.eye(2)) <= deltas[t]**2]
+				constr += [cp.quad_form(x[:2,self.N]-SS_vector[:2,min(self.N,SS_vector.shape[1]-1)], np.eye(2)) <= deltas[min(self.N,len(deltas)-1)]**2]
 
 		# Cost Function
 		cost = 0
@@ -141,6 +151,15 @@ class FTOCP(object):
 			raise(ValueError('Optimization was infeasible for step %i' % abs_t))
 		elif problem.status == 'unbounded':
 			raise(ValueError('Optimization was unbounded for step %i' % abs_t))
+
+		if SS is not None:
+			if cost.value > self.costFTOCP:
+				print('The cost is not decreasing at step %i' % abs_t)
+				print('This iteration: %g' % cost.value)
+				print('Last iteration: %g' % self.costFTOCP)
+				pdb.set_trace()
+
+			self.costFTOCP = cost.value
 
 		return(x.value, u.value)
 

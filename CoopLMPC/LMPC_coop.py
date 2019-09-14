@@ -34,6 +34,7 @@ class LMPC(object):
 		# Compute and store the cost associated with the feasible trajectory
 		cost = self.computeCost(x, u, xf)
 		self.Qfun.append(cost)
+		self.ftocp.costFTOCP = cost[0] + 0.1
 
 		# Augment iteration counter and print the cost of the trajectories stored in the safe set
 		self.it = self.it + 1
@@ -48,9 +49,9 @@ class LMPC(object):
 		for t in range(l-1,-1,-1):
 			if t == l-1: # Terminal cost
 				# cost = [la.norm((self.Q**0.5).dot(x[:,t]-xf),ord=2)**2]
-				cost = [10*x[1,t]**2]
+				# cost = [10*x[1,t]**2]
+				cost = [0]
 			else:
-				# cost.append(la.norm((self.Q**0.5).dot(x[:,t]-xf),ord=2)**2 + la.norm((self.R**0.5).dot(u[:,t]),ord=2)**2 + 1 + cost[-1])
 				cost.append(10*x[1,t]**2 + u[:,t].T.dot(self.R).dot(u[:,t]) + 1 + cost[-1])
 		# Finally flip the cost to have correct order
 		return np.flip(cost).tolist()

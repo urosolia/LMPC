@@ -25,14 +25,20 @@ def plot_agent_trajs(x, deltas=None, r=0, trail=False, fig=None):
     ax.set_ylim([-1.5, 1.5])
 
     t = 0
+    text_vars = []
     while not np.all(end_flags):
         if not trail:
             ax.clear()
             ax.set_xlim([-1.5, 2.5])
             ax.set_ylim([-1.5, 1.5])
+        if len(text_vars) != 0:
+            for txt in text_vars:
+                txt.remove()
+            text_vars = []
         for i in range(n_a):
             plot_t = min(t, traj_lens[i]-1)
             ax.plot(x[i][0,plot_t], x[i][1,plot_t], '.', c=c[i])
+            text_vars.append(ax.text(x[i][0,plot_t]+r+0.05, x[i][1,plot_t]+r+0.05, str(i+1), fontsize=12, bbox=dict(facecolor='white', alpha=1.)))
             if r > 0:
                 ax.plot(x[i][0,plot_t]+r*np.cos(np.linspace(0,2*np.pi,100)),
                     x[i][1,plot_t]+r*np.sin(np.linspace(0,2*np.pi,100)), c=c[i])

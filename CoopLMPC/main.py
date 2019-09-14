@@ -35,7 +35,7 @@ def solve_init_traj(ftocp, x0, waypt, xf):
 			tol = 0
 		else:
 			xg = xf.reshape((n_x))
-			tol = 5
+			tol = 7
 
 		(x_pred, u_pred) = ftocp.solve(xt, xf=xg, CVX=True, verbose=False) # Solve FTOCP
 
@@ -62,7 +62,7 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False):
 
 	xcl = x0 # initialize system state at interation it
 	ucl = np.empty((n_u,0))
-	tol = 5
+	tol = 7
 
 	t = 0
 	# time Loop (Perform the task until close to the origin)
@@ -198,7 +198,7 @@ def main():
 	ucl_feas = []
 
 	# Parallelization flag
-	parallel = True
+	parallel = False
 	plot_init = False
 
 	# Initialize FTOCP objects
@@ -229,6 +229,9 @@ def main():
 	if plot_init:
 		plot_utils.plot_agent_trajs(xcl_feas, r=r_a, trail=True)
 
+	for i in range(n_a):
+		xcl_feas[i] = np.append(xcl_feas[i], xf[i], axis=1)
+		ucl_feas[i] = np.append(ucl_feas[i], np.zeros((n_u,1)), axis=1)
 	# ====================================================================================
 
 	# sys.exit()
@@ -264,11 +267,7 @@ def main():
 		delta_log.append(deltas)
 		delta_plot.update(deltas)
 
-		# if it == 0:
-		# 	traj_fig = plot_utils.plot_agent_trajs(xcls[-1], r=0, trail=True)
-		# else:
-		# 	plot_utils.plot_agent_trajs(xcls[-1], r=0, trail=True, fig=traj_fig)
-		f = plot_utils.plot_agent_trajs(xcls[-1], r=r_a, trail=True)
+		f = plot_utils.plot_agent_trajs(xcls[-1], r=r_a, deltas=deltas, trail=True)
 		f.savefig('/'.join((plot_dir, start_time, 'it_%i_trajs.png' % it)))
 
 		x_it = []
