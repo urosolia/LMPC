@@ -134,21 +134,182 @@ class updateable_ts(object):
 
         self.fig.canvas.draw()
 
-# def plot_deltas(deltas):
-#     n_a = deltas[0].shape[0]
-#     n_d = len(deltas)
-#     self.c = [matplotlib.cm.get_cmap('jet')(i*(1./(n_d-1))) for i in range(n_d)]
-#     fig = plt.figure()
-#     axs = [plt.subplot(n_a, 1, i+1) for i in range(n_a)]
-#
-#     for (i, a) in enumerate(axs):
-#         a.set_ylabel('Agent %i' % (i+1))
-#         if i == 0:
-#             a.set_title('Deltas')
-#         if i == len(axs)-1:
-#             a.set_xlabel('Time')
-#
-#     for (i, d) in enumerate(deltas):
-#         t = range(d.shape[1])
-#         for (j, a) in enumerate(axs):
-#             a.plot(t, d[j,:], c=c[i])
+class lmpc_visualizer(object):
+    def __init__(self, pos_dims, n_state_dims, n_act_dims, agent_id=None, plot_dir=None):
+        if len(pos_dims) > 2:
+            raise(ValueError('Can only plot 2 position dimensions'))
+        self.agent_id = agent_id
+        self.pos_dims = pos_dims
+        self.n_state_dims = n_state_dims
+        self.n_act_dims = n_act_dims
+        self.plot_dir = plot_dir
+
+        plt.ion()
+
+        # Initialize position plot
+        self.pos_fig = plt.figure()
+        self.pos_ax = plt.gca()
+        self.pos_ax.set_xlim([-1.5, 2.5])
+        self.pos_ax.set_ylim([-1.5, 1.5])
+        self.pos_ax.set_xlabel('$x$')
+        self.pos_ax.set_ylabel('$y$')
+        self.pos_ax.set_title('Agent %i' % (agent_id+1))
+        self.pos_fig.canvas.set_window_title('agent %i positions' % (agent_id+1))
+        self.pos_fig.canvas.draw()
+
+        # Initialize velocity plot
+        self.state_fig = plt.figure(figsize=(5,4))
+        self.state_axs = [self.state_fig.add_subplot(n_state_dims, 1, i+1) for i in range(n_state_dims)]
+        for (i, a) in enumerate(self.state_axs):
+            a.set_ylabel('$x_%i$' % (i+1))
+            if i == 0:
+                a.set_title('Agent %i' % (agent_id+1))
+            if i < len(self.state_axs)-1:
+                a.xaxis.set_ticklabels([])
+            if i == len(self.state_axs)-1:
+                a.set_xlabel('$t$')
+        self.state_fig.canvas.set_window_title('agent %i states' % (agent_id+1))
+        self.state_fig.canvas.draw()
+
+        # Initialize input plot
+        self.act_fig = plt.figure(figsize=(5,4))
+        self.act_axs = [self.act_fig.add_subplot(n_act_dims, 1, i+1) for i in range(n_act_dims)]
+        for (i, a) in enumerate(self.act_axs):
+            a.set_ylabel('$u_%i$' % (i+1))
+            if i == 0:
+                a.set_title('Agent %i' % (agent_id+1))
+            if i < len(self.act_axs)-1:
+                a.xaxis.set_ticklabels([])
+            if i == len(self.act_axs)-1:
+                a.set_xlabel('$t$')
+        self.act_fig.canvas.set_window_title('agent %i inputs' % (agent_id+1))
+        self.act_fig.canvas.draw()
+
+        self.prev_pos_cl = None
+        self.prev_state_cl = None
+        self.prev_act_cl = None
+
+        self.it = 0
+
+    def clear_state_plots(self):
+        self.pos_ax.clear()
+        self.pos_ax.set_xlim([-1.5, 2.5])
+        self.pos_ax.set_ylim([-1.5, 1.5])
+        self.pos_ax.set_xlabel('$x$')
+        self.pos_ax.set_ylabel('$y$')
+        self.pos_ax.set_title('Agent %i' % (self.agent_id+1))
+        for a in self.state_axs:
+            a.clear()
+        for (i, a) in enumerate(self.state_axs):
+            a.set_ylabel('$x_%i$' % (i+1))
+            if i == 0:
+                a.set_title('Agent %i' % (self.agent_id+1))
+            if i < len(self.state_axs)-1:
+                a.xaxis.set_ticklabels([])
+            if i == len(self.state_axs)-1:
+                a.set_xlabel('$t$')
+
+    def clear_act_plot(self):
+        for a in self.act_axs:
+            a.clear()
+        for (i, a) in enumerate(self.act_axs):
+            a.set_ylabel('$u_%i$' % (i+1))
+            if i == 0:
+                a.set_title('Agent %i' % (self.agent_id+1))
+            if i < len(self.act_axs)-1:
+                a.xaxis.set_ticklabels([])
+            if i == len(self.act_axs)-1:
+                a.set_xlabel('$t$')
+
+    def update_prev_trajs(self, state_traj=None, act_traj=None):
+        # state_traj is a list of numpy arrays. Each numpy array is the closed-loop trajectory of an agent.
+        if state_traj is not None:
+            self.prev_pos_cl = [s[self.pos_dims,:] for s in state_traj]
+            self.prev_state_cl = state_traj
+        if act_traj is not None:
+            self.prev_act_cl = act_traj
+
+        self.it += 1
+
+    def plot_state_traj(self, state_cl, state_preds, t, deltas=None):
+        self.clear_state_plots()
+
+        pos_preds = state_preds[self.pos_dims, :]
+        pred_len = state_preds.shape[1]
+
+        # Pick out position and velocity dimensions
+        pos_cl = state_cl[self.pos_dims, :]
+        cl_len = state_cl.shape[1]
+
+        c_pred = [matplotlib.cm.get_cmap('jet')(i*(1./(pred_len-1))) for i in range(pred_len)]
+
+        # Plot entire previous closed loop trajectory for comparison
+        if self.prev_pos_cl is not None:
+            n_a = len(self.prev_pos_cl)
+            c = [matplotlib.cm.get_cmap('jet')(i*(1./(n_a-1))) for i in range(n_a)]
+            for (i, s) in enumerate(self.prev_pos_cl):
+                self.pos_ax.plot(s[0,:], s[1,:], '.', c=c[i], markersize=1)
+                # self.pos_ax.text(s[0,0]+0.1, s[1,0]+0.1, 'Agent %i' % (i+1), fontsize=12, bbox=dict(facecolor='white', alpha=1.))
+
+            # Plot the deltas
+            if deltas is not None:
+                prev_pos_cl = self.prev_pos_cl[self.agent_id]
+                for i in range(t, t+pred_len):
+                    plot_t = min(i, prev_pos_cl.shape[1]-1)
+                    self.pos_ax.plot(prev_pos_cl[0,plot_t]+deltas[plot_t]*np.cos(np.linspace(0,2*np.pi,100)),
+                        prev_pos_cl[1,plot_t]+deltas[plot_t]*np.sin(np.linspace(0,2*np.pi,100)), '--', linewidth=0.7, c=c_pred[i-t])
+
+        # Plot the closed loop position trajectory up to this iteration and the optimal solution at this iteration
+
+        self.pos_ax.scatter(pos_preds[0,:], pos_preds[1,:], marker='.', c=c_pred)
+        self.pos_ax.plot(pos_cl[0,:], pos_cl[1,:], 'k.')
+
+        # Plot the closed loop state trajectory up to this iteration and the optimal solution at this iteration
+        for (i, a) in enumerate(self.state_axs):
+            if self.prev_state_cl is not None:
+                l = self.prev_state_cl[self.agent_id].shape[1]
+                a.plot(range(l), self.prev_state_cl[self.agent_id][i,:], 'b.')
+            a.plot(range(t, t+pred_len), state_preds[i,:], 'g.')
+            a.plot(range(t, t+pred_len), state_preds[i,:], 'g')
+            a.plot(range(cl_len), state_cl[i,:], 'k.')
+
+        self.pos_fig.canvas.draw()
+        self.state_fig.canvas.draw()
+
+        # Save plots if plot_dir was specified
+        if self.plot_dir is not None:
+            f_name = 'it_%i_time_%i.png' % (self.it, t)
+            if self.agent_id is not None:
+                f_name = '_'.join((('agent_%i' % self.agent_id), f_name))
+            f_name = '_'.join(('pos', f_name))
+            self.pos_fig.savefig('/'.join((self.plot_dir, f_name)))
+
+            f_name = 'it_%i_time_%i.png' % (self.it, t)
+            if self.agent_id is not None:
+                f_name = '_'.join((('agent_%i' % self.agent_id), f_name))
+            f_name = '_'.join(('state', f_name))
+            self.state_fig.savefig('/'.join((self.plot_dir, f_name)))
+
+    def plot_act_traj(self, act_cl, act_preds, t):
+        self.clear_act_plot()
+
+        cl_len = act_cl.shape[1]
+        pred_len = act_preds.shape[1]
+
+        # Plot the closed loop input trajectory up to this iteration and the optimal solution at this iteration
+        for (i, a) in enumerate(self.act_axs):
+            if self.prev_act_cl is not None:
+                l = self.prev_act_cl[self.agent_id].shape[1]
+                a.plot(range(l), self.prev_act_cl[self.agent_id][i,:], 'b.')
+            a.plot(range(t, t+pred_len), act_preds[i,:], 'g.')
+            a.plot(range(t, t+pred_len), act_preds[i,:], 'g')
+            a.plot(range(cl_len), act_cl[i,:], 'k.')
+
+        self.act_fig.canvas.draw()
+
+        if self.plot_dir is not None:
+            f_name = 'it_%i_time_%i.png' % (self.it, t)
+            if self.agent_id is not None:
+                f_name = '_'.join((('agent_%i' % self.agent_id), f_name))
+            f_name = '_'.join(('act', f_name))
+            self.act_fig.savefig('/'.join((self.plot_dir, f_name)))

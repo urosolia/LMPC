@@ -56,7 +56,7 @@ def solve_init_traj(ftocp, x0, waypt, xf):
 
 	return (xcl_feas, ucl_feas)
 
-def solve_lmpc(lmpc, x0, xf, deltas, verbose=False):
+def solve_lmpc(lmpc, x0, xf, deltas, verbose=False, visualizer=None, pause=False):
 	n_x = lmpc.ftocp.n
 	n_u = lmpc.ftocp.d
 
@@ -70,6 +70,10 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False):
 		xt = xcl[:,t] # Read measurements
 		(x_pred, u_pred) = lmpc.solve(xt, xf=xf, abs_t=t, deltas=deltas, verbose=verbose) # Solve FTOCP
 
+		if visualizer is not None:
+			visualizer.plot_state_traj(xcl, x_pred, t, deltas=deltas)
+			visualizer.plot_act_traj(ucl, u_pred, t)
+
 		# Read input and apply it to the system
 		ut = u_pred[:,0].reshape((n_u, 1))
 		xtp1 = lmpc.ftocp.model(xt.reshape((n_x, 1)), ut)
@@ -80,6 +84,9 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False):
 		# print('Time step: %i, Distance: %g' % (t, la.norm(xtp1-xf.reshape((n_x,1)), ord=2)))
 		if la.norm(xtp1-xf.reshape((n_x,1)), ord=2) <= 10**(-tol):
 			break
+
+		if pause:
+			raw_input('Iteration %i. Press enter to continue: ' % t)
 
 		t += 1
 
@@ -145,6 +152,11 @@ def main():
 	if not os.path.exists(plot_dir):
 	    os.makedirs(plot_dir)
 
+	# Flags
+	parallel = False # Parallelization flag
+	plot_init = False # Plot initial trajectory
+	pause_each_solve = False # Pause on each FTOCP solution
+
 	# Number of agents
 	n_a = 2
 	n_x = 4
@@ -166,7 +178,7 @@ def main():
 	Hx = 1.*np.vstack((np.eye(n_x), -np.eye(n_x)))
 	gx = 10.*np.ones((2*n_x))
 	Hu = 1.*np.vstack((np.eye(n_u), -np.eye(n_u)))
-	gu = 1.*np.ones((2*n_u))
+	gu = 2.*np.ones((2*n_u))
 
 	# Initial Condition
 	x0 = [np.nan*np.ones((n_x, 1)) for _ in range(n_a)]
@@ -197,10 +209,6 @@ def main():
 	xcl_feas = []
 	ucl_feas = []
 
-	# Parallelization flag
-	parallel = False
-	plot_init = False
-
 	# Initialize FTOCP objects
 	N_feas = 10
 	ftocp = [FTOCP(N_feas, A[i], B[i], 0.1*Q, R, Hx=Hx, gx=gx, Hu=Hu, gu=gu) for i in range(n_a)]
@@ -224,17 +232,17 @@ def main():
 			ucl_feas.append(u)
 	end = time.time()
 
+	for i in range(n_a):
+		xcl_feas[i] = np.append(xcl_feas[i], xf[i], axis=1)
+		ucl_feas[i] = np.append(ucl_feas[i], np.zeros((n_u,1)), axis=1)
+
+	
+
 	print('Time elapsed: %g s' % (end - start))
 
 	if plot_init:
 		plot_utils.plot_agent_trajs(xcl_feas, r=r_a, trail=True)
-
-	for i in range(n_a):
-		xcl_feas[i] = np.append(xcl_feas[i], xf[i], axis=1)
-		ucl_feas[i] = np.append(ucl_feas[i], np.zeros((n_u,1)), axis=1)
 	# ====================================================================================
-
-	# sys.exit()
 
 	# ====================================================================================
 	# Run LMPC
@@ -254,27 +262,34 @@ def main():
 
 	totalIterations = 20 # Number of iterations to perform
 	start_time = str(time.time())
-	os.makedirs('/'.join((plot_dir, start_time)))
+	exp_dir = '/'.join((plot_dir, start_time))
+	os.makedirs(exp_dir)
 
-	# Initialize objective value plot
+	# Initialize objective plots
 	# obj_plot = plot_utils.updateable_plot(n_a, title='Agent Trajectory Costs', x_label='Iteration')
-	delta_plot = plot_utils.updateable_ts(n_a, title='Deltas', x_label='Time', y_label=['Agent %i' % (i+1) for i in range(n_a)])
+	# delta_plot = plot_utils.updateable_ts(n_a, title='Deltas', x_label='Time', y_label=['Agent %i' % (i+1) for i in range(n_a)])
+	lmpc_vis = [plot_utils.lmpc_visualizer(pos_dims=[0,1], n_state_dims=n_x, n_act_dims=n_u, agent_id=i, plot_dir=exp_dir) for i in range(n_a)]
+
+	raw_input('Ready to run LMPC, press enter to continue...')
 
 	# run simulation
 	# iteration loop
 	for it in range(totalIterations):
+		for lv in lmpc_vis:
+			lv.update_prev_trajs(state_traj=xcls[-1], act_traj=ucls[-1])
+
 		deltas = get_traj_deltas(xcls[-1], xf, r_a=r_a) # Compute deltas with last trajectory
 		delta_log.append(deltas)
-		delta_plot.update(deltas)
+		# delta_plot.update(deltas)
 
-		f = plot_utils.plot_agent_trajs(xcls[-1], r=r_a, deltas=deltas, trail=True)
+		f = plot_utils.plot_agent_trajs(xcls[-1], r=r_a, deltas=None, trail=True)
 		f.savefig('/'.join((plot_dir, start_time, 'it_%i_trajs.png' % it)))
 
 		x_it = []
 		u_it = []
 		for i in range(n_a):
 			print('Agent %i' % (i+1))
-			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], deltas[i,:])
+			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], deltas[i,:], visualizer=lmpc_vis[i], pause=pause_each_solve)
 			opt_cost = lmpc[i].addTrajectory(xcl, ucl)
 			# obj_plot.update(np.array([it, opt_cost]).T, i)
 			x_it.append(xcl)

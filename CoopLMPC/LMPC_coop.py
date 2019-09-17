@@ -52,7 +52,7 @@ class LMPC(object):
 				# cost = [10*x[1,t]**2]
 				cost = [0]
 			else:
-				cost.append(10*x[1,t]**2 + u[:,t].T.dot(self.R).dot(u[:,t]) + 1 + cost[-1])
+				cost.append(x[1,t]**2 + u[:,t].T.dot(self.R).dot(u[:,t]) + 1 + cost[-1])
 		# Finally flip the cost to have correct order
 		return np.flip(cost).tolist()
 
