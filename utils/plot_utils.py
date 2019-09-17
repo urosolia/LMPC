@@ -27,14 +27,14 @@ def plot_agent_trajs(x, deltas=None, r=0, trail=False, fig=None):
     t = 0
     text_vars = []
     while not np.all(end_flags):
-        if not trail:
-            ax.clear()
-            ax.set_xlim([-1.5, 2.5])
-            ax.set_ylim([-1.5, 1.5])
         if len(text_vars) != 0:
             for txt in text_vars:
                 txt.remove()
             text_vars = []
+        if not trail:
+            ax.clear()
+            ax.set_xlim([-2.5, 2.5])
+            ax.set_ylim([-2.5, 1.5])
         for i in range(n_a):
             plot_t = min(t, traj_lens[i]-1)
             ax.plot(x[i][0,plot_t], x[i][1,plot_t], '.', c=c[i])
@@ -45,7 +45,7 @@ def plot_agent_trajs(x, deltas=None, r=0, trail=False, fig=None):
                 # ax.plot(x[i][0,plot_t]+l*np.array([-1, -1, 1, 1, -1]), x[i][1,plot_t]+l*np.array([-1, 1, 1, -1, -1]), c=c[i])
             if deltas is not None:
                 ax.plot(x[i][0,plot_t]+deltas[i,t]*np.cos(np.linspace(0,2*np.pi,100)),
-                    x[i][1,plot_t]+deltas[i,t]*np.sin(np.linspace(0,2*np.pi,100)), '--', c=c[i])
+                    x[i][1,plot_t]+deltas[i,t]*np.sin(np.linspace(0,2*np.pi,100)), '--', c=c[i], linewidth=0.7)
             if not end_flags[i] and t >= traj_lens[i]-1:
                 end_flags[i] = True
         t += 1

@@ -11,10 +11,9 @@ from matplotlib import rc
 # rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=True)
 
-import utils.plot_utils
+filehandler = open('lmpc_object.pkl', 'r')
+lmpc = pickle.load(filehandler)
 
-f = open('lmpc_object.pkl', 'r')
-lmpc = pickle.load(f)
 
 # =========================================================
 # Plot closed-loop trajectories

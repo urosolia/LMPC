@@ -20,6 +20,8 @@ from FTOCP_coop import FTOCP
 from LMPC_coop import LMPC
 import utils.plot_utils
 
+pdb.set_trace()
+
 def solve_init_traj(ftocp, x0, waypt, xf):
 	n_x = ftocp.n
 	n_u = ftocp.d
@@ -27,8 +29,12 @@ def solve_init_traj(ftocp, x0, waypt, xf):
 	xcl_feas = x0
 	ucl_feas = np.empty((n_u,0))
 
-	mode = 0
+	if waypt is None:
+		mode = 1
+	else:
+		mode = 0
 	t = 0
+
 	# time Loop (Perform the task until close to the origin)
 	while True:
 		xt = xcl_feas[:,t] # Read measurements
@@ -38,7 +44,7 @@ def solve_init_traj(ftocp, x0, waypt, xf):
 			tol = 0
 		else:
 			xg = xf.reshape((n_x))
-			tol = 7
+			tol = 5
 
 		(x_pred, u_pred) = ftocp.solve(xt, xf=xg, CVX=True, verbose=False) # Solve FTOCP
 
@@ -65,7 +71,7 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False, visualizer=None, pause=False
 
 	xcl = x0 # initialize system state at interation it
 	ucl = np.empty((n_u,0))
-	tol = 7
+	tol = 5
 
 	t = 0
 	# time Loop (Perform the task until close to the origin)
@@ -157,14 +163,14 @@ def main():
 	log_dir = '/'.join((BASE_DIR, 'logs'))
 	if not os.path.exists(log_dir):
 	    os.makedirs(log_dir)
-
+		
 	# Flags
 	parallel = False # Parallelization flag
 	plot_init = False # Plot initial trajectory
 	pause_each_solve = False # Pause on each FTOCP solution
 
 	# Number of agents
-	n_a = 2
+	n_a = 3
 	n_x = 4
 	n_u = 2
 
@@ -175,8 +181,10 @@ def main():
 	B = [np.nan*np.ones((n_x, n_u)) for _ in range(n_a)]
 	A[0] = np.array([[1, 0, 0.2, 0],[0, 1, 0, 0.2], [0, 0, 1, 0], [0, 0, 0, 1]])
 	A[1] = np.array([[1, 0, 0.2, 0],[0, 1, 0, 0.2], [0, 0, 1, 0], [0, 0, 0, 1]])
+	A[2] = np.array([[1, 0, 0.2, 0],[0, 1, 0, 0.2], [0, 0, 1, 0], [0, 0, 0, 1]])
 	B[0] = np.array([[0, 0], [0, 0], [0.2, 0], [0, 0.2]])
 	B[1] = np.array([[0, 0], [0, 0], [0.2, 0], [0, 0.2]])
+	B[2] = np.array([[0, 0], [0, 0], [0.2, 0], [0, 0.2]])
 	Q = np.diag([1.0, 1.0, 1.0, 1.0]) #np.eye(2)
 	R = np.diag([0.1, 0.1]) #np.array([[1]])
 
@@ -188,13 +196,15 @@ def main():
 
 	# Initial Condition
 	x0 = [np.nan*np.ones((n_x, 1)) for _ in range(n_a)]
-	x0[0] = np.array([[0, 0, 0, 0]]).T
-	x0[1] = np.array([[2, 0, 0, 0]]).T
+	x0[0] = np.array([[-1, 1, 0, 0]]).T
+	x0[1] = np.array([[1, 1, 0, 0]]).T
+	x0[2] = np.array([[2, 0, 0, 0]]).T
 
 	# Goal condition
 	xf = [np.nan*np.ones((n_x, 1)) for _ in range(n_a)]
-	xf[0] = np.array([[1, 0, 0, 0]]).T
-	xf[1] = np.array([[-1, 0, 0, 0]]).T
+	xf[0] = np.array([[1, -1, 0, 0]]).T
+	xf[1] = np.array([[-1, -1, 0, 0]]).T
+	xf[2] = np.array([[-2, 0, 0, 0]]).T
 
 	# Check to make sure all agent dynamics, inital, and goal states have been defined
 	if np.any(np.isnan(A)) or np.any(np.isnan(B)):
@@ -210,7 +220,8 @@ def main():
 	# Run simulation to compute feasible solutions for all agents
 	# ====================================================================================
 	# Intermediate waypoint to ensure collision-free trajectory
-	waypt = [np.array([[2, 1.5, 0, 0]]).T, np.array([[0, -1.5, 0, 0]]).T]
+	# waypt = [np.array([[2, 1.5, 0, 0]]).T, np.array([[0, -1.5, 0, 0]]).T]
+	waypt = None
 
 	xcl_feas = []
 	ucl_feas = []
@@ -224,7 +235,7 @@ def main():
 		# Create threads
 		pool = mp.Pool(processes=n_a)
 		# Assign thread to agent trajectory
-		results = [pool.apply_async(solve_init_traj, args=(ftocp[i], x0[i], waypt[i], xf[i])) for i in range(n_a)]
+		results = [pool.apply_async(solve_init_traj, args=(ftocp[i], x0[i], None, xf[i])) for i in range(n_a)]
 		# Sync point
 		init_trajs = [r.get() for r in results]
 
@@ -233,7 +244,7 @@ def main():
 		ucl_feas = list(ucl_feas)
 	else:
 		for i in range(n_a):
-			(x, u) = solve_init_traj(ftocp[i], x0[i], waypt[i], xf[i])
+			(x, u) = solve_init_traj(ftocp[i], x0[i], None, xf[i])
 			xcl_feas.append(x)
 			ucl_feas.append(u)
 	end = time.time()
@@ -242,12 +253,26 @@ def main():
 		xcl_feas[i] = np.append(xcl_feas[i], xf[i], axis=1)
 		ucl_feas[i] = np.append(ucl_feas[i], np.zeros((n_u,1)), axis=1)
 
+	xcl_lens = [xcl_feas[i].shape[1] for i in range(n_a)]
 
+	for i in range(n_a):
+		before_len = 0
+		after_len = 0
+		for j in range(i):
+			before_len += xcl_lens[j]
+		for j in range(i+1, n_a):
+			after_len += xcl_lens[j]
+
+		xcl_feas[i] = np.hstack((np.tile(x0[i], before_len), xcl_feas[i], np.tile(xf[i], after_len)))
+		ucl_feas[i] = np.hstack((np.zeros((n_u, before_len)), ucl_feas[i], np.zeros((n_u, after_len))))
+
+	# pdb.set_trace()
 
 	print('Time elapsed: %g s' % (end - start))
 
 	if plot_init:
 		plot_utils.plot_agent_trajs(xcl_feas, r=r_a, trail=True)
+
 	# ====================================================================================
 
 	# ====================================================================================
@@ -255,7 +280,7 @@ def main():
 	# ====================================================================================
 
 	# Initialize LMPC objects for each agent
-	N_LMPC = [6, 6] # horizon lengths
+	N_LMPC = [6, 6, 6] # horizon lengths
 	ftocp_for_lmpc = [FTOCP(N_LMPC[i], A[i], B[i], Q, R, Hx=Hx, gx=gx, Hu=Hu, gu=gu) for i in range(n_a)]# ftocp solve by LMPC
 	lmpc = [LMPC(f, CVX=False) for f in ftocp_for_lmpc]# Initialize the LMPC decide if you wanna use the CVX hull
 	for i in range(n_a):
@@ -288,7 +313,8 @@ def main():
 		delta_log.append(deltas)
 		# delta_plot.update(deltas)
 
-		f = plot_utils.plot_agent_trajs(xcls[-1], r=r_a, deltas=None, trail=True)
+		f = plot_utils.plot_agent_trajs(xcls[-1], r=r_a, deltas=deltas, trail=False)
+		pdb.set_trace()
 		f.savefig('/'.join((plot_dir, start_time, 'it_%i_trajs.png' % it)))
 
 		x_it = []
@@ -304,6 +330,7 @@ def main():
 		xcls.append(x_it)
 		ucls.append(u_it)
 	# =====================================================================================
+
 
 	# ====================================================================================
 	# Compute optimal solution by solving a FTOCP with long horizon
