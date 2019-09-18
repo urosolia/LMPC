@@ -83,6 +83,8 @@ class FTOCP(object):
 		# Store the open-loop predicted trajectory
 		self.xPred = x.value
 		self.uPred = u.value	
+		if SS is not None:
+			self.lamb  = lambVar.value
 
 
 	def model(self, x, u):
