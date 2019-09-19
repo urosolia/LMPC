@@ -26,9 +26,10 @@ def main():
 	# Initialize LMPC object
 
 	# lmpc = LMPC(ftocp, l='all', P='all') # Basically this is the LMPC from the TAC paper as uses all iteration and data points
+	lmpc = LMPC(ftocp, l=3, P=40) 
 	# lmpc = LMPC(ftocp, l=3, P=16) 
 	# lmpc = LMPC(ftocp, l=2, P=10)
-	lmpc = LMPC(ftocp, l=1,  P=8)   
+	# lmpc = LMPC(ftocp, l=1,  P=8)   
 
  	# Add feasible trajectory to the safe set
 	lmpc.addTrajectory(xclFeasible, uclFeasible)

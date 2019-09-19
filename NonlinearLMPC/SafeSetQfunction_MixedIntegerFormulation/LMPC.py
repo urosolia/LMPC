@@ -241,23 +241,6 @@ class LMPC(object):
 		maxData = np.min([x.shape[1], self.P])
 		return idxMinNorm[0:self.P]
 
-	# def timeSS(self, it):
-	# 	if self.P =='all':
-	# 		currIdx = self.SSindices[it]
-	# 	else:		
-	# 		currIdx = self.SSindices[it]
-
-	# 		if np.max(currIdx)>=np.shape(self.SS[it])[1]:
-	# 			currIdx[currIdx>=np.shape(self.SS[it])[1]] = np.shape(self.SS[it])[1]-1
-
-	# 		if np.min(currIdx)< 0:
-	# 			currIdx[currIdx<0] = 0
-				
-	# 		self.SSindices[it] = self.SSindices[it] + 1
-
-	# 	print currIdx
-	# 	return currIdx
-
 	def timeSS(self, it):
 		currIdx = self.SSindices[it]
 

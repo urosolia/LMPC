@@ -120,8 +120,8 @@ input = raw_input("Do you want to run comparison for different values of P and l
 # =========================================================
 # Plot inputs
 # =========================================================
-l = [1, 2,3, 10]
-P = [8,10,16,'all']
+l = [1, 2,3,10]
+P = [8,10,40,'all']
 labelLMPC = 'LMPC from [21]'
 pltMarker = ['-o', '--s','-d','--v']
 if input == 'y':
@@ -151,6 +151,37 @@ if input == 'y':
 	plt.ylabel('$\mathrm{Acceleration}$', fontsize=20)
 	plt.legend()
 
+# =========================================================
+# Plot acceleration and velocities
+# =========================================================
+labelLMPC = 'LMPC from [21]'
+pltMarker = ['-o', '--s','-d','--v']
+if input == 'y':
+	i = it
+	plt.figure()
+
+	plt.subplot(2, 1, 1)	
+	for i in range(0,len(P)):
+		xcl = np.loadtxt('storedData/closedLoopIteration'+str(it)+'_P_'+str(P[i])+'.txt')
+		if P[i] == 'all':
+			plt.plot(xcl[:,2], '-o', label=labelLMPC)
+		else:
+			plt.plot(xcl[:,2], '-o', label="LMPC closed-loop for P = "+str(P[i])+", i="+str(l[i]))
+
+		plt.ylabel('$\mathrm{Steering}$', fontsize=20)
+
+
+	plt.subplot(2, 1, 2)
+	for i in range(0,len(P)):
+		ucl = np.loadtxt('storedData/inputIteration'+str(it)+'_P_'+str(P[i])+'.txt')
+		plt.plot(ucl[:,1], '-o', label="LMPC closed-loop for P = "+str(i)+", i="+str(l[i]))
+
+	plt.plot([0,ucl.shape[0]-1],[1,1], '--k', label='Saturation limit')
+	plt.plot([0,ucl.shape[0]-1],[-1,-1], '--k')
+	plt.xlabel('$\mathrm{Time~Step}$', fontsize=20)
+	plt.ylabel('$\mathrm{Acceleration}$', fontsize=20)
+	plt.legend()
+
 	# =========================================================
 	# Closed-loop comparison (X-Y)
 	# =========================================================
@@ -163,7 +194,7 @@ if input == 'y':
 		xcl = np.loadtxt('storedData/closedLoopIteration'+str(it)+'_P_'+str(P[i])+'.txt')
 		xcl = xcl.T
 		if P[i] == "all":
-			plt.plot(xcl[0,:], xcl[1,:], '-o', label=labelLMPC)
+			plt.plot(xcl[0,:], xcl[1,:], '--d', label=labelLMPC)
 		else:	
 			plt.plot(xcl[0,:], xcl[1,:], '-o', label="LMPC closed-loop for P = "+str(P[i])+", i="+str(l[i]))
 
@@ -188,7 +219,7 @@ if input == 'y':
 		cost = mat[:,1].tolist()
 		cost.insert(0, 39)
 		if P[i] == "all":
-			plt.plot(range(0,len(cost)), cost, '-o', label=labelLMPC)
+			plt.plot(range(0,len(cost)), cost, '--d', label=labelLMPC)
 		else:
 			plt.plot(range(0,len(cost)), cost, '-o', label='${P =}$'+str(P[i])+', ${i =}$'+str(l[i]))
 	
@@ -201,7 +232,7 @@ if input == 'y':
 		mat = np.loadtxt('storedData/meanTimeLMPC'+'_P_'+str(P[i])+'.txt')
 		compTime = mat[:,0].tolist()
 		if P[i] == "all":
-			plt.plot(range(1,len(compTime)+1), compTime, '-o', label=labelLMPC)	
+			plt.plot(range(1,len(compTime)+1), compTime, '--d', label=labelLMPC)	
 		else:
 			plt.plot(range(1,len(compTime)+1), compTime, '-o', label='${P =}$'+str(P[i])+', ${i =}$'+str(l[i]))		
 
