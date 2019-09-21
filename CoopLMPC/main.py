@@ -247,7 +247,7 @@ def main():
 	print('Time elapsed: %g s' % (end - start))
 
 	if plot_init:
-		plot_utils.plot_agent_trajs(xcl_feas, r=r_a, trail=True)
+		utils.plot_utils.plot_agent_trajs(xcl_feas, r=r_a, trail=True)
 	# ====================================================================================
 
 	# ====================================================================================
@@ -272,9 +272,9 @@ def main():
 	os.makedirs(exp_dir)
 
 	# Initialize objective plots
-	# obj_plot = plot_utils.updateable_plot(n_a, title='Agent Trajectory Costs', x_label='Iteration')
-	# delta_plot = plot_utils.updateable_ts(n_a, title='Deltas', x_label='Time', y_label=['Agent %i' % (i+1) for i in range(n_a)])
-	lmpc_vis = [plot_utils.lmpc_visualizer(pos_dims=[0,1], n_state_dims=n_x, n_act_dims=n_u, agent_id=i, plot_dir=exp_dir) for i in range(n_a)]
+	# obj_plot = utils.plot_utils.updateable_plot(n_a, title='Agent Trajectory Costs', x_label='Iteration')
+	# delta_plot = utils.plot_utils.updateable_ts(n_a, title='Deltas', x_label='Time', y_label=['Agent %i' % (i+1) for i in range(n_a)])
+	lmpc_vis = [utils.plot_utils.lmpc_visualizer(pos_dims=[0,1], n_state_dims=n_x, n_act_dims=n_u, agent_id=i, plot_dir=exp_dir) for i in range(n_a)]
 
 	raw_input('Ready to run LMPC, press enter to continue...')
 
@@ -288,7 +288,7 @@ def main():
 		delta_log.append(deltas)
 		# delta_plot.update(deltas)
 
-		f = plot_utils.plot_agent_trajs(xcls[-1], r=r_a, deltas=None, trail=True)
+		f = utils.plot_utils.plot_agent_trajs(xcls[-1], r=r_a, deltas=None, trail=True)
 		f.savefig('/'.join((plot_dir, start_time, 'it_%i_trajs.png' % it)))
 
 		x_it = []
