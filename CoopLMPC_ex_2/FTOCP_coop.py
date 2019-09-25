@@ -1,3 +1,5 @@
+from __future__ import division
+
 import numpy as np
 import pdb
 import scipy as sp
@@ -44,12 +46,13 @@ class FTOCP(object):
 	# 	# Using the cvxpy norm function here
 	# 	return cp.norm(self.Q**0.5*(x-xf))**2
 
-	def solve(self, x0, xf=None, abs_t=None, deltas=None, SS=None, Qfun=None, CVX=False, verbose=False):
+	def solve(self, x0, xf=None, abs_t=None, ball_con=None, lin_con=None, SS=None, Qfun=None, CVX=False, verbose=False):
 		"""This methos solve a FTOCP given:
 			- x0: initial condition
 			- xf: (optional) goal condition, defaults to the origin
-			- abs_t: (required if deltas is provided) absolute time step
-			- deltas: (optional) allowed deviations from previous trajectory
+			- abs_t: (required if circular or linear constraints are provided) absolute time step
+			- ball_con: (optional) allowed deviations within a ball from previous trajectory
+			- lin_con: (optional) allowed deviations within a polytope
 			- SS: (optional) contains a set of state and the terminal constraint is ConvHull(SS)
 			- Qfun: (optional) cost associtated with the state stored in SS. Terminal cost is BarycentrcInterpolation(SS, Qfun)
 			- CVX: (optional)
@@ -58,6 +61,10 @@ class FTOCP(object):
 			xf = np.zeros(self.n)
 		else:
 			xf = np.reshape(xf, self.n)
+
+		if lin_con is not None:
+			H = lin_con[0]
+			g = lin_con[1]
 
 		# Initialize Variables
 		x = cp.Variable((self.n, self.N+1))
@@ -78,14 +85,14 @@ class FTOCP(object):
 				lambVar = cp.Variable((SS_vector.shape[1], 1), boolean=True) # Initialize vector of variables
 				gamVar = cp.Variable((self.N+1), boolean=True)
 
-		# if deltas is not None:
-		# 	deltas = np.copy(deltas[abs_t:min(len(deltas),abs_t+int(2*(self.N+1)))])
-
 		if not CVX:
 			M = 1000 # Big M multiplier
 
 		constr = [x[:,0] == x0] # Initial condition
 		for i in range(self.N):
+			if abs_t is not None:
+				t = min(abs_t+i, SS_vector.shape[1]-1)
+
 			constr += [x[:,i+1] == self.A*x[:,i] + self.B*u[:,i]] # Dynamics
 
 			if self.Hx is not None:
@@ -98,14 +105,17 @@ class FTOCP(object):
 				bigM_ub = xf+M*np.ones(self.n)*gamVar[i]
 				bigM_lb = xf-M*np.ones(self.n)*gamVar[i]
 				constr += [x[:,i] <= bigM_ub, -x[:,i] <= -bigM_lb]
-			if deltas is not None:
-				# Constrain positions to be within mutual agreed deviations at each time step
+			if ball_con is not None:
 				if abs_t is None:
 					raise(ValueError('Absolute time step must be given'))
-				t = min(abs_t+i, SS_vector.shape[1]-1)
-				constr += [cp.quad_form(x[:2,i]-SS_vector[:2,t], np.eye(2)) <= deltas[t]**2]
-				# constr += [cp.norm_inf(x[:2,i]-SS_vector[:2,t]) <= deltas[t]]
-				# constr += [cp.quad_form(x[:2,i]-SS_vector[:2,min(i,SS_vector.shape[1]-1)], np.eye(2)) <= deltas[min(i,len(deltas)-1)]**2]
+				# Constrain positions to be within mutual agreed deviations at each time step
+				constr += [cp.quad_form(x[:2,i]-SS_vector[:2,t], np.eye(2)) <= ball_con[t]**2]
+				# constr += [cp.norm_inf(x[:2,i]-SS_vector[:2,t]) <= ball_con[t]]
+				# constr += [cp.quad_form(x[:2,i]-SS_vector[:2,min(i,SS_vector.shape[1]-1)], np.eye(2)) <= ball_con[min(i,len(ball_con)-1)]**2]
+			if lin_con is not None:
+				if abs_t is None:
+					raise(ValueError('Absolute time step must be given'))
+				constr += [H[t]*x[:2,i]+g[t] <= 0]
 
 		# Terminal Constraint if SS not empty
 		if SS is not None:
@@ -113,12 +123,15 @@ class FTOCP(object):
 			constr += [SS_vector * lambVar[:,0] == x[:,self.N],
 						np.ones((1, SS_vector.shape[1])) * lambVar[:,0] == 1, # \lambda sum to 1 or only 1 \lambda is equal to 1
 						lambVar >= 0] # Multipliers are positive definite
-			if deltas is not None:
+			if ball_con is not None:
 				# Constrain last position to be within mutual agreed deviations
 				t = min(abs_t+self.N, SS_vector.shape[1]-1)
-				constr += [cp.quad_form(x[:2,self.N]-SS_vector[:2,t], np.eye(2)) <= deltas[t]**2]
-				# constr += [cp.norm_inf(x[:2,self.N]-SS_vector[:2,t]) <= deltas[t]]
-				# constr += [cp.quad_form(x[:2,self.N]-SS_vector[:2,min(self.N,SS_vector.shape[1]-1)], np.eye(2)) <= deltas[min(self.N,len(deltas)-1)]**2]
+				constr += [cp.quad_form(x[:2,self.N]-SS_vector[:2,t], np.eye(2)) <= ball_con[t]**2]
+				# constr += [cp.norm_inf(x[:2,self.N]-SS_vector[:2,t]) <= ball_con[t]]
+				# constr += [cp.quad_form(x[:2,self.N]-SS_vector[:2,min(self.N,SS_vector.shape[1]-1)], np.eye(2)) <= ball_con[min(self.N,len(ball_con)-1)]**2]
+			if lin_con is not None:
+				t = min(abs_t+self.N, SS_vector.shape[1]-1)
+				constr += [H[t]*x[:2,self.N]+g[t] <= 0]
 
 		# Cost Function
 		cost = 0

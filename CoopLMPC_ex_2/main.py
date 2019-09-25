@@ -1,9 +1,13 @@
+from __future__ import division
+
 import numpy as np
 import numpy.linalg as la
 import cvxpy as cp
-import pdb
+import scipy as sp
+import scipy.spatial
 import multiprocessing as mp
 import itertools
+import pdb
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -19,10 +23,9 @@ sys.path.append(BASE_DIR)
 from FTOCP_coop import FTOCP
 from LMPC_coop import LMPC
 import utils.plot_utils
+import utils.utils
 
-pdb.set_trace()
-
-def solve_init_traj(ftocp, x0, waypt, xf):
+def solve_init_traj(ftocp, x0, waypt, xf, tol=-7):
 	n_x = ftocp.n
 	n_u = ftocp.d
 
@@ -41,10 +44,10 @@ def solve_init_traj(ftocp, x0, waypt, xf):
 
 		if mode == 0:
 			xg = waypt.reshape((n_x))
-			tol = 0
+			act_tol = 0
 		else:
 			xg = xf.reshape((n_x))
-			tol = 5
+			act_tol = tol
 
 		(x_pred, u_pred) = ftocp.solve(xt, xf=xg, CVX=True, verbose=False) # Solve FTOCP
 
@@ -56,7 +59,7 @@ def solve_init_traj(ftocp, x0, waypt, xf):
 
 		# print('Time step: %i, Distance: %g' % (t, la.norm(xtp1-xf.reshape((n_x,1)), ord=2)))
 		# Close within tolerance
-		if la.norm(xtp1-xg.reshape((n_x,1)), ord=2) <= 10**(-tol):
+		if la.norm(xtp1-xg.reshape((n_x,1)), ord=2) <= 10**act_tol:
 			if mode == 1:
 				break
 			mode += 1
@@ -65,23 +68,24 @@ def solve_init_traj(ftocp, x0, waypt, xf):
 
 	return (xcl_feas, ucl_feas)
 
-def solve_lmpc(lmpc, x0, xf, deltas, verbose=False, visualizer=None, pause=False):
+def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visualizer=None, pause=False, tol=-7):
 	n_x = lmpc.ftocp.n
 	n_u = lmpc.ftocp.d
 
 	xcl = x0 # initialize system state at interation it
 	ucl = np.empty((n_u,0))
-	tol = 5
 
 	t = 0
 	# time Loop (Perform the task until close to the origin)
 	while True:
 		xt = xcl[:,t] # Read measurements
-		(x_pred, u_pred) = lmpc.solve(xt, xf=xf, abs_t=t, deltas=deltas, verbose=verbose) # Solve FTOCP
+		(x_pred, u_pred) = lmpc.solve(xt, xf=xf, abs_t=t, ball_con=ball_con, lin_con=lin_con, verbose=verbose) # Solve FTOCP
 
 		if visualizer is not None:
-			visualizer.plot_state_traj(xcl, x_pred, t, deltas=deltas)
+			visualizer.plot_state_traj(xcl, x_pred, t, ball_con=ball_con, lin_con=lin_con, shade=True)
 			visualizer.plot_act_traj(ucl, u_pred, t)
+
+		pdb.set_trace()
 
 		# Read input and apply it to the system
 		ut = u_pred[:,0].reshape((n_u, 1))
@@ -91,7 +95,7 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False, visualizer=None, pause=False
 		xcl = np.append(xcl, xtp1, axis=1)
 
 		# print('Time step: %i, Distance: %g' % (t, la.norm(xtp1-xf.reshape((n_x,1)), ord=2)))
-		if la.norm(xtp1-xf.reshape((n_x,1)), ord=2) <= 10**(-tol):
+		if la.norm(xtp1-xf.reshape((n_x,1)), ord=2) <= 10**tol:
 			break
 
 		if pause:
@@ -104,77 +108,29 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False, visualizer=None, pause=False
 	# lmpc.addTrajectory(xcl, ucl)
 	return xcl, ucl
 
-def get_traj_deltas(agent_xcls, xf, r_a=0):
-	deltas = []
-	n_a = len(agent_xcls)
-	n_x = agent_xcls[0].shape[0]
-	traj_lens = [agent_xcls[i].shape[1] for i in range(n_a)]
-	max_traj_len = np.amax(traj_lens)
-
-	# Pad trajectories so they are all the same length
-	for i in range(n_a):
-		if traj_lens[i] < max_traj_len:
-			n_rep = max_traj_len - traj_lens[i]
-			agent_xcls[i] = np.append(agent_xcls[i], np.tile(agent_xcls[i][:,-1].reshape((n_x,1)), n_rep), axis=1)
-
-	# Solve for pair-wise distances between trajectory points for each agent at each time step
-	for i in range(max_traj_len):
-		# print('Timestep %i' % i)
-		d = cp.Variable(n_a)
-		pairs = map(list, itertools.combinations(range(n_a), 2))
-
-		# Constraints
-		constr = [d >= 0]
-		for p in pairs:
-			# r_i+r_j <= ||x_i-x_j||_2
-			# print('d[%i] + d[%i] <= %g' % (p[0], p[1], la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i], ord=2)-2*r_a))
-			constr += [d[p[0]]+d[p[1]] <= la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i], ord=2)-2*r_a]
-			# constr += [d[p[0]]+d[p[1]] <= la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i], ord=np.inf)-2*r_a]
-
-		# Cost
-		if n_a == 2:
-			w = np.array([min(i+1,traj_lens[j]) for j in range(n_a)])
-		else:
-			w = np.array([la.norm(agent_xcls[j][:2,i]-xf[j][:2], ord=2) for j in range(n_a)])
-		cost = w*d
-
-		problem = cp.Problem(cp.Maximize(cost), constr)
-		try:
-		    problem.solve()
-		except Exception as e:
-		    print(e)
-
-		if problem.status == 'infeasible':
-			raise(ValueError('Optimization was infeasible for step %i' % i))
-		elif problem.status == 'unbounded':
-			raise(ValueError('Optimization was unbounded for step %i' % i))
-
-		deltas.append(d.value)
-
-	deltas = np.array(deltas).T
-
-	return deltas
-
 def main():
 	plot_dir = '/'.join((BASE_DIR, 'plots'))
 	if not os.path.exists(plot_dir):
-	    os.makedirs(plot_dir)
+		os.makedirs(plot_dir)
 
 	log_dir = '/'.join((BASE_DIR, 'logs'))
 	if not os.path.exists(log_dir):
-	    os.makedirs(log_dir)
-		
+		os.makedirs(log_dir)
+
 	# Flags
 	parallel = False # Parallelization flag
 	plot_init = False # Plot initial trajectory
 	pause_each_solve = False # Pause on each FTOCP solution
+
+	plot_lims = [[-2.5, 2.5], [-2.5, 2.5]]
+	tol = -5
 
 	# Number of agents
 	n_a = 3
 	n_x = 4
 	n_u = 2
 
-	r_a = 0.1 # Agents are circles with radius a_r
+	r_a = [0.1, 0.2, 0.3] # Agents are circles with radius a_r
 
 	# Define system dynamics and cost for each agent
 	A = [np.nan*np.ones((n_x, n_x)) for _ in range(n_a)]
@@ -235,7 +191,7 @@ def main():
 		# Create threads
 		pool = mp.Pool(processes=n_a)
 		# Assign thread to agent trajectory
-		results = [pool.apply_async(solve_init_traj, args=(ftocp[i], x0[i], None, xf[i])) for i in range(n_a)]
+		results = [pool.apply_async(solve_init_traj, args=(ftocp[i], x0[i], None, xf[i], tol)) for i in range(n_a)]
 		# Sync point
 		init_trajs = [r.get() for r in results]
 
@@ -244,7 +200,7 @@ def main():
 		ucl_feas = list(ucl_feas)
 	else:
 		for i in range(n_a):
-			(x, u) = solve_init_traj(ftocp[i], x0[i], None, xf[i])
+			(x, u) = solve_init_traj(ftocp[i], x0[i], None, xf[i], tol=tol)
 			xcl_feas.append(x)
 			ucl_feas.append(u)
 	end = time.time()
@@ -253,6 +209,8 @@ def main():
 		xcl_feas[i] = np.append(xcl_feas[i], xf[i], axis=1)
 		ucl_feas[i] = np.append(ucl_feas[i], np.zeros((n_u,1)), axis=1)
 
+	# Shift agent trajectories in time so that they occur sequentially
+	# (no collisions)
 	xcl_lens = [xcl_feas[i].shape[1] for i in range(n_a)]
 
 	for i in range(n_a):
@@ -289,7 +247,6 @@ def main():
 
 	xcls = [copy.copy(xcl_feas)]
 	ucls = [copy.copy(ucl_feas)]
-	delta_log = []
 
 	totalIterations = 20 # Number of iterations to perform
 	start_time = str(time.time())
@@ -299,7 +256,7 @@ def main():
 	# Initialize objective plots
 	# obj_plot = plot_utils.updateable_plot(n_a, title='Agent Trajectory Costs', x_label='Iteration')
 	# delta_plot = plot_utils.updateable_ts(n_a, title='Deltas', x_label='Time', y_label=['Agent %i' % (i+1) for i in range(n_a)])
-	lmpc_vis = [plot_utils.lmpc_visualizer(pos_dims=[0,1], n_state_dims=n_x, n_act_dims=n_u, agent_id=i, plot_dir=exp_dir) for i in range(n_a)]
+	lmpc_vis = [utils.plot_utils.lmpc_visualizer(pos_dims=[0,1], n_state_dims=n_x, n_act_dims=n_u, agent_id=i, plot_lims=plot_lims, plot_dir=exp_dir) for i in range(n_a)]
 
 	raw_input('Ready to run LMPC, press enter to continue...')
 
@@ -309,11 +266,10 @@ def main():
 		for lv in lmpc_vis:
 			lv.update_prev_trajs(state_traj=xcls[-1], act_traj=ucls[-1])
 
-		deltas = get_traj_deltas(xcls[-1], xf, r_a=r_a) # Compute deltas with last trajectory
-		delta_log.append(deltas)
-		# delta_plot.update(deltas)
+		# ball_con = utils.utils.get_traj_ball_con(xcls[-1], xf, r_a=r_a) # Compute ball_con with last trajectory
+		lin_con = utils.utils.get_traj_lin_con(xcls[-1], xf, r_a=r_a)
 
-		f = plot_utils.plot_agent_trajs(xcls[-1], r=r_a, deltas=deltas, trail=False)
+		f = utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims)
 		pdb.set_trace()
 		f.savefig('/'.join((plot_dir, start_time, 'it_%i_trajs.png' % it)))
 
@@ -321,7 +277,7 @@ def main():
 		u_it = []
 		for i in range(n_a):
 			print('Agent %i' % (i+1))
-			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], deltas[i,:], visualizer=lmpc_vis[i], pause=pause_each_solve)
+			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], lin_con=lin_con[i], visualizer=lmpc_vis[i], pause=pause_each_solve, tol=tol)
 			opt_cost = lmpc[i].addTrajectory(xcl, ucl)
 			# obj_plot.update(np.array([it, opt_cost]).T, i)
 			x_it.append(xcl)

@@ -1,3 +1,5 @@
+from __future__ import division
+
 import numpy as np
 import numpy.linalg as la
 import cvxpy as cp
@@ -23,25 +25,29 @@ from LMPC_coop import LMPC
 import utils.plot_utils
 import utils.utils
 
-def solve_init_traj(ftocp, x0, waypt, xf):
+def solve_init_traj(ftocp, x0, waypt, xf, tol=-7):
 	n_x = ftocp.n
 	n_u = ftocp.d
 
 	xcl_feas = x0
 	ucl_feas = np.empty((n_u,0))
 
-	mode = 0
+	if waypt is None:
+		mode = 1
+	else:
+		mode = 0
 	t = 0
+
 	# time Loop (Perform the task until close to the origin)
 	while True:
 		xt = xcl_feas[:,t] # Read measurements
 
 		if mode == 0:
 			xg = waypt.reshape((n_x))
-			tol = 0
+			act_tol = 0
 		else:
 			xg = xf.reshape((n_x))
-			tol = 7
+			act_tol = tol
 
 		(x_pred, u_pred) = ftocp.solve(xt, xf=xg, CVX=True, verbose=False) # Solve FTOCP
 
@@ -53,7 +59,7 @@ def solve_init_traj(ftocp, x0, waypt, xf):
 
 		# print('Time step: %i, Distance: %g' % (t, la.norm(xtp1-xf.reshape((n_x,1)), ord=2)))
 		# Close within tolerance
-		if la.norm(xtp1-xg.reshape((n_x,1)), ord=2) <= 10**(-tol):
+		if la.norm(xtp1-xg.reshape((n_x,1)), ord=2) <= 10**act_tol:
 			if mode == 1:
 				break
 			mode += 1
@@ -62,13 +68,12 @@ def solve_init_traj(ftocp, x0, waypt, xf):
 
 	return (xcl_feas, ucl_feas)
 
-def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visualizer=None, pause=False):
+def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visualizer=None, pause=False, tol=-7):
 	n_x = lmpc.ftocp.n
 	n_u = lmpc.ftocp.d
 
 	xcl = x0 # initialize system state at interation it
 	ucl = np.empty((n_u,0))
-	tol = 7
 
 	t = 0
 	# time Loop (Perform the task until close to the origin)
@@ -77,7 +82,7 @@ def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visuali
 		(x_pred, u_pred) = lmpc.solve(xt, xf=xf, abs_t=t, ball_con=ball_con, lin_con=lin_con, verbose=verbose) # Solve FTOCP
 
 		if visualizer is not None:
-			visualizer.plot_state_traj(xcl, x_pred, t, ball_con=ball_con, lin_con=lin_con)
+			visualizer.plot_state_traj(xcl, x_pred, t, ball_con=ball_con, lin_con=lin_con, shade=True)
 			visualizer.plot_act_traj(ucl, u_pred, t)
 
 		# Read input and apply it to the system
@@ -88,7 +93,7 @@ def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visuali
 		xcl = np.append(xcl, xtp1, axis=1)
 
 		# print('Time step: %i, Distance: %g' % (t, la.norm(xtp1-xf.reshape((n_x,1)), ord=2)))
-		if la.norm(xtp1-xf.reshape((n_x,1)), ord=2) <= 10**(-tol):
+		if la.norm(xtp1-xf.reshape((n_x,1)), ord=2) <= 10**tol:
 			break
 
 		if pause:
@@ -100,70 +105,6 @@ def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visuali
 	# Add trajectory to update the safe set and value function
 	# lmpc.addTrajectory(xcl, ucl)
 	return xcl, ucl
-
-def get_traj_ball_con(agent_xcls, xf, r_a=None):
-	ball_con = []
-	n_a = len(agent_xcls)
-
-	if n_a == 1:
-		return None
-
-	n_x = agent_xcls[0].shape[0]
-	traj_lens = [agent_xcls[i].shape[1] for i in range(n_a)]
-	max_traj_len = np.amax(traj_lens)
-
-	if r_a is None:
-		r_a = [0 for _ in range(n_a)]
-
-	# Pad trajectories so they are all the same length
-	for i in range(n_a):
-		if traj_lens[i] < max_traj_len:
-			n_rep = max_traj_len - traj_lens[i]
-			agent_xcls[i] = np.append(agent_xcls[i], np.tile(agent_xcls[i][:,-1].reshape((n_x,1)), n_rep), axis=1)
-
-	# Solve for pair-wise distances between trajectory points for each agent at each time step
-	for i in range(max_traj_len):
-		# print('Timestep %i' % i)
-		A = np.vstack([agent_xcls[j][:2,i] for j in range(n_a)])
-		d = utils.utils.get_agent_distances(A, i, traj_lens, r_a)
-		ball_con.append(d)
-
-	ball_con = np.array(ball_con).T
-
-	return ball_con
-
-def get_traj_lin_con(agent_xcls, xf, r_a=None):
-	n_a = len(agent_xcls)
-
-	if n_a == 1:
-		return (None, None)
-
-	H_cl = [[] for _ in range(n_a)]
-	g_cl = [[] for _ in range(n_a)]
-
-	n_x = agent_xcls[0].shape[0]
-	traj_lens = [agent_xcls[i].shape[1] for i in range(n_a)]
-	max_traj_len = np.amax(traj_lens)
-
-	if r_a is None:
-		r_a = [0 for _ in range(n_a)]
-
-	# Pad trajectories so they are all the same length
-	for i in range(n_a):
-		if traj_lens[i] < max_traj_len:
-			n_rep = max_traj_len - traj_lens[i]
-			agent_xcls[i] = np.append(agent_xcls[i], np.tile(agent_xcls[i][:,-1].reshape((n_x,1)), n_rep), axis=1)
-
-	# Solve for new set of exploration constraints
-	for t in range(max_traj_len):
-		A = np.vstack([agent_xcls[j][:2,t] for j in range(n_a)])
-		H_t, g_t = utils.utils.get_agent_polytopes(A, t, traj_lens, r_a)
-		for i in range(n_a):
-			H_cl[i].append(H_t[i])
-			g_cl[i].append(g_t[i])
-		# pdb.set_trace()
-
-	return zip(H_cl, g_cl)
 
 def main():
 	plot_dir = '/'.join((BASE_DIR, 'plots'))
@@ -180,14 +121,14 @@ def main():
 	pause_each_solve = False # Pause on each FTOCP solution
 
 	plot_lims = [[-2.5, 2.5], [-2.5, 2.5]]
+	tol = -7
 
 	# Number of agents
 	n_a = 2
 	n_x = 4
 	n_u = 2
 
-	# r_a = 0.1 # Agents are circles with radius r_a
-	r_a = [0.1, 0.2]
+	r_a = [0.1, 0.2] # Agents are circles with radius r_a
 
 	# Define system dynamics and cost for each agent
 	A = [np.nan*np.ones((n_x, n_x)) for _ in range(n_a)]
@@ -243,7 +184,7 @@ def main():
 		# Create threads
 		pool = mp.Pool(processes=n_a)
 		# Assign thread to agent trajectory
-		results = [pool.apply_async(solve_init_traj, args=(ftocp[i], x0[i], waypt[i], xf[i])) for i in range(n_a)]
+		results = [pool.apply_async(solve_init_traj, args=(ftocp[i], x0[i], waypt[i], xf[i], tol)) for i in range(n_a)]
 		# Sync point
 		init_trajs = [r.get() for r in results]
 
@@ -252,7 +193,7 @@ def main():
 		ucl_feas = list(ucl_feas)
 	else:
 		for i in range(n_a):
-			(x, u) = solve_init_traj(ftocp[i], x0[i], waypt[i], xf[i])
+			(x, u) = solve_init_traj(ftocp[i], x0[i], waypt[i], xf[i], tol=tol)
 			xcl_feas.append(x)
 			ucl_feas.append(u)
 	end = time.time()
@@ -299,8 +240,8 @@ def main():
 		for lv in lmpc_vis:
 			lv.update_prev_trajs(state_traj=xcls[-1], act_traj=ucls[-1])
 
-		# ball_con = get_traj_ball_con(xcls[-1], xf, r_a=r_a) # Compute ball_con with last trajectory
-		lin_con = get_traj_lin_con(xcls[-1], xf, r_a=r_a)
+		# ball_con = utils.utils.get_traj_ball_con(xcls[-1], xf, r_a=r_a) # Compute ball_con with last trajectory
+		lin_con = utils.utils.get_traj_lin_con(xcls[-1], xf, r_a=r_a, tol=tol)
 
 		f = utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims)
 		f.savefig('/'.join((plot_dir, start_time, 'it_%i_trajs.png' % it)))
@@ -310,7 +251,7 @@ def main():
 		for i in range(n_a):
 			print('Agent %i' % (i+1))
 			# (xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], ball_con=ball_con[i,:], visualizer=lmpc_vis[i], pause=pause_each_solve)
-			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], lin_con=lin_con[i], visualizer=lmpc_vis[i], pause=pause_each_solve)
+			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], lin_con=lin_con[i], visualizer=lmpc_vis[i], pause=pause_each_solve, tol=tol)
 			opt_cost = lmpc[i].addTrajectory(xcl, ucl)
 			# obj_plot.update(np.array([it, opt_cost]).T, i)
 			x_it.append(xcl)
