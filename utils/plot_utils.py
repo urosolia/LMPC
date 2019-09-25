@@ -1,21 +1,19 @@
 import numpy as np
+import copy, pickle, pdb, time, sys
+
 import matplotlib
 matplotlib.use('TkAgg')
-import matplotlib.font_manager
-matplotlib.font_manager._rebuild()
+# import matplotlib.font_manager
+# matplotlib.font_manager._rebuild()
 import matplotlib.pyplot as plt
-import copy, pickle, pdb, time
 from matplotlib import rc
-# rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=True)
 
 # Trajectory animation with circular exploration constraints
-def plot_agent_trajs(x, deltas=None, lin_constr=None, r_a=None, trail=False, shade=False, plot_lims=None):
-    if deltas is not None and lin_constr is not None:
-        raise ValueError('Can only provide one type of exploration constraint')
-    if lin_constr is not None:
-        H_cl = lin_constr[0]
-        g_cl = lin_constr[1]
+def plot_agent_trajs(x, ball_con=None, lin_con=None, r_a=None, trail=False, shade=False, plot_lims=None):
+    if lin_con is not None:
+        H_cl = lin_con[0]
+        g_cl = lin_con[1]
         boundary_x = np.linspace(plot_lims[0][0], plot_lims[0][1], 50)
         if shade:
             p1 = np.linspace(plot_lims[0][0], plot_lims[0][1], 30)
@@ -62,12 +60,12 @@ def plot_agent_trajs(x, deltas=None, lin_constr=None, r_a=None, trail=False, sha
                     x[i][1,plot_t]+r_a[i]*np.sin(np.linspace(0,2*np.pi,100)), c=c[i])
                 # ax.plot(x[i][0,plot_t]+l*np.array([-1, -1, 1, 1, -1]), x[i][1,plot_t]+l*np.array([-1, 1, 1, -1, -1]), c=c[i])
 
-            if deltas is not None:
-                ax.plot(x[i][0,plot_t]+deltas[i,t]*np.cos(np.linspace(0,2*np.pi,100)),
-                    x[i][1,plot_t]+deltas[i,t]*np.sin(np.linspace(0,2*np.pi,100)), '--', c=c[i], linewidth=0.7)
-            elif lin_constr is not None:
-                H = H_cl[t][i]
-                g = g_cl[t][i]
+            if ball_con is not None:
+                ax.plot(x[i][0,plot_t]+ball_con[i,t]*np.cos(np.linspace(0,2*np.pi,100)),
+                    x[i][1,plot_t]+ball_con[i,t]*np.sin(np.linspace(0,2*np.pi,100)), '--', c=c[i], linewidth=0.7)
+            if lin_con is not None:
+                H = H_cl[i][t]
+                g = g_cl[i][t]
                 boundary_y = (-H[0,0]*boundary_x - g[0])/(H[0,1]+1e-10)
 
                 if shade:
@@ -169,7 +167,7 @@ class updateable_ts(object):
         self.fig.canvas.draw()
 
 class lmpc_visualizer(object):
-    def __init__(self, pos_dims, n_state_dims, n_act_dims, agent_id=None, plot_dir=None):
+    def __init__(self, pos_dims, n_state_dims, n_act_dims, agent_id, plot_lims=None, plot_dir=None):
         if len(pos_dims) > 2:
             raise(ValueError('Can only plot 2 position dimensions'))
         self.agent_id = agent_id
@@ -177,14 +175,16 @@ class lmpc_visualizer(object):
         self.n_state_dims = n_state_dims
         self.n_act_dims = n_act_dims
         self.plot_dir = plot_dir
+        self.plot_lims = plot_lims
 
         plt.ion()
 
         # Initialize position plot
         self.pos_fig = plt.figure()
         self.pos_ax = plt.gca()
-        self.pos_ax.set_xlim([-1.5, 2.5])
-        self.pos_ax.set_ylim([-1.5, 1.5])
+        if self.plot_lims is not None:
+            self.pos_ax.set_xlim(self.plot_lims[0])
+            self.pos_ax.set_ylim(self.plot_lims[1])
         self.pos_ax.set_xlabel('$x$')
         self.pos_ax.set_ylabel('$y$')
         self.pos_ax.set_title('Agent %i' % (agent_id+1))
@@ -227,8 +227,9 @@ class lmpc_visualizer(object):
 
     def clear_state_plots(self):
         self.pos_ax.clear()
-        self.pos_ax.set_xlim([-1.5, 2.5])
-        self.pos_ax.set_ylim([-1.5, 1.5])
+        if self.plot_lims is not None:
+            self.pos_ax.set_xlim(self.plot_lims[0])
+            self.pos_ax.set_ylim(self.plot_lims[1])
         self.pos_ax.set_xlabel('$x$')
         self.pos_ax.set_ylabel('$y$')
         self.pos_ax.set_title('Agent %i' % (self.agent_id+1))
@@ -265,7 +266,7 @@ class lmpc_visualizer(object):
 
         self.it += 1
 
-    def plot_state_traj(self, state_cl, state_preds, t, deltas=None):
+    def plot_state_traj(self, state_cl, state_preds, t, ball_con=None, lin_con=None):
         self.clear_state_plots()
 
         pos_preds = state_preds[self.pos_dims, :]
@@ -285,13 +286,23 @@ class lmpc_visualizer(object):
                 self.pos_ax.plot(s[0,:], s[1,:], '.', c=c[i], markersize=1)
                 # self.pos_ax.text(s[0,0]+0.1, s[1,0]+0.1, 'Agent %i' % (i+1), fontsize=12, bbox=dict(facecolor='white', alpha=1.))
 
-            # Plot the deltas
-            if deltas is not None:
-                prev_pos_cl = self.prev_pos_cl[self.agent_id]
+            agent_prev_cl = self.prev_pos_cl[self.agent_id]
+
+            # Plot the ball constraint
+            if ball_con is not None:
                 for i in range(t, t+pred_len):
-                    plot_t = min(i, prev_pos_cl.shape[1]-1)
-                    self.pos_ax.plot(prev_pos_cl[0,plot_t]+deltas[plot_t]*np.cos(np.linspace(0,2*np.pi,100)),
-                        prev_pos_cl[1,plot_t]+deltas[plot_t]*np.sin(np.linspace(0,2*np.pi,100)), '--', linewidth=0.7, c=c_pred[i-t])
+                    plot_t = min(i, agent_prev_cl.shape[1]-1)
+                    self.pos_ax.plot(agent_prev_cl[0,plot_t]+ball_con[plot_t]*np.cos(np.linspace(0,2*np.pi,100)),
+                        agent_prev_cl[1,plot_t]+ball_con[plot_t]*np.sin(np.linspace(0,2*np.pi,100)), '--', linewidth=0.7, c=c_pred[i-t])
+            if lin_con is not None:
+                boundary_x = np.linspace(self.plot_lims[0][0], self.plot_lims[0][1], 50)
+                for i in range(t, t+pred_len):
+                    plot_t = min(i, agent_prev_cl.shape[1]-1)
+                    H = lin_con[0][plot_t]
+                    g = lin_con[1][plot_t]
+                    for j in range(H.shape[0]):
+                        boundary_y = (-H[j,0]*boundary_x - g[j])/(H[j,1]+1e-10)
+                        self.pos_ax.plot(boundary_x, boundary_y, '--', linewidth=0.7, c=c_pred[i-t])
 
         # Plot the closed loop position trajectory up to this iteration and the optimal solution at this iteration
 
@@ -307,8 +318,11 @@ class lmpc_visualizer(object):
             a.plot(range(t, t+pred_len), state_preds[i,:], 'g')
             a.plot(range(cl_len), state_cl[i,:], 'k.')
 
-        self.pos_fig.canvas.draw()
-        self.state_fig.canvas.draw()
+        try:
+            self.pos_fig.canvas.draw()
+            self.state_fig.canvas.draw()
+        except KeyboardInterrupt:
+            sys.exit()
 
         # Save plots if plot_dir was specified
         if self.plot_dir is not None:
@@ -339,7 +353,10 @@ class lmpc_visualizer(object):
             a.plot(range(t, t+pred_len), act_preds[i,:], 'g')
             a.plot(range(cl_len), act_cl[i,:], 'k.')
 
-        self.act_fig.canvas.draw()
+        try:
+            self.act_fig.canvas.draw()
+        except KeyboardInterrupt:
+            sys.exit()
 
         if self.plot_dir is not None:
             f_name = 'it_%i_time_%i.png' % (self.it, t)
