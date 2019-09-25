@@ -39,7 +39,7 @@ class FTOCP(object):
 		x = Variable((self.n, self.N+1))
 		u = Variable((self.d, self.N))
 
-		# If SS is given construct a matrix collacting all states and a vector collection all costs
+		# If SS is given initialize lambdaVar multipliers used to encorce terminal constraint
 		if SS is not None:
 			if CVX == True:
 				lambVar = Variable((SS.shape[1], 1), boolean=False) # Initialize vector of variables
@@ -55,7 +55,7 @@ class FTOCP(object):
 						x[:,i] >= -10.0,
 						x[:,i] <=  10.0,]
 
-		# Terminal Constraint if SS not empty
+		# Terminal Constraint if SS not empty --> enforce the terminal constraint
 		if SS is not None:
 			constr += [SS * lambVar[:,0] == x[:,self.N], # Terminal state \in ConvHull(SS)
 						np.ones((1, SS.shape[1])) * lambVar[:,0] == 1, # Multiplies \lambda sum to 1
@@ -64,7 +64,7 @@ class FTOCP(object):
 		# Cost Function
 		cost = 0
 		for i in range(0, self.N):
-			# Running cost h(x,u) = x^TQx + u^TRu (you can try to use quad_form, but it does not work ...)
+			# Running cost h(x,u) = x^TQx + u^TRu
 			cost += quad_form(x[:,i], self.Q) + norm(self.R**0.5*u[:,i])**2
 			# cost += norm(self.Q**0.5*x[:,i])**2 + norm(self.R**0.5*u[:,i])**2
 
@@ -78,7 +78,7 @@ class FTOCP(object):
 		# Solve the Finite Time Optimal Control Problem
 		problem = Problem(Minimize(cost), constr)
 		if CVX == True:
-			problem.solve(verbose=verbose, solver=ECOS)
+			problem.solve(verbose=verbose, solver=ECOS) # I find that ECOS is better please use it when solving QPs
 		else:
 			problem.solve(verbose=verbose)
 
