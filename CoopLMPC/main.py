@@ -1,9 +1,11 @@
 import numpy as np
 import numpy.linalg as la
 import cvxpy as cp
-import pdb
+import scipy as sp
+import scipy.spatial
 import multiprocessing as mp
 import itertools
+import pdb
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -19,6 +21,7 @@ sys.path.append(BASE_DIR)
 from FTOCP_coop import FTOCP
 from LMPC_coop import LMPC
 import utils.plot_utils
+import utils.utils
 
 def solve_init_traj(ftocp, x0, waypt, xf):
 	n_x = ftocp.n
@@ -98,12 +101,15 @@ def solve_lmpc(lmpc, x0, xf, deltas, verbose=False, visualizer=None, pause=False
 	# lmpc.addTrajectory(xcl, ucl)
 	return xcl, ucl
 
-def get_traj_deltas(agent_xcls, xf, r_a=0):
+def get_traj_deltas(agent_xcls, xf, r_a=None):
 	deltas = []
 	n_a = len(agent_xcls)
 	n_x = agent_xcls[0].shape[0]
 	traj_lens = [agent_xcls[i].shape[1] for i in range(n_a)]
 	max_traj_len = np.amax(traj_lens)
+
+	if r_a is None:
+		r_a = [0 for _ in range(n_a)]
 
 	# Pad trajectories so they are all the same length
 	for i in range(n_a):
@@ -114,40 +120,41 @@ def get_traj_deltas(agent_xcls, xf, r_a=0):
 	# Solve for pair-wise distances between trajectory points for each agent at each time step
 	for i in range(max_traj_len):
 		# print('Timestep %i' % i)
-		d = cp.Variable(n_a)
-		pairs = map(list, itertools.combinations(range(n_a), 2))
-
-		# Constraints
-		constr = [d >= 0]
-		for p in pairs:
-			# r_i+r_j <= ||x_i-x_j||_2
-			# print('d[%i] + d[%i] <= %g' % (p[0], p[1], la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i], ord=2)-2*r_a))
-			constr += [d[p[0]]+d[p[1]] <= la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i], ord=2)-2*r_a]
-			# constr += [d[p[0]]+d[p[1]] <= la.norm(agent_xcls[p[0]][:2,i]-agent_xcls[p[1]][:2,i], ord=np.inf)-2*r_a]
-
-		# Cost
-		if n_a == 2:
-			w = np.array([min(i+1,traj_lens[j]) for j in range(n_a)])
-		else:
-			w = np.array([la.norm(agent_xcls[j][:2,i]-xf[j][:2], ord=2) for j in range(n_a)])
-		cost = w*d
-
-		problem = cp.Problem(cp.Maximize(cost), constr)
-		try:
-		    problem.solve()
-		except Exception as e:
-		    print(e)
-
-		if problem.status == 'infeasible':
-			raise(ValueError('Optimization was infeasible for step %i' % i))
-		elif problem.status == 'unbounded':
-			raise(ValueError('Optimization was unbounded for step %i' % i))
-
-		deltas.append(d.value)
+		A = np.vstack([agent_xcls[j][:2,i] for j in range(n_a)])
+		d = utils.utils.get_agent_distances(A, i, traj_lens, r_a)
+		deltas.append(d)
 
 	deltas = np.array(deltas).T
 
 	return deltas
+
+def get_traj_constraints(agent_xcls, xf, r_a=None):
+	H_cl = []
+	g_cl = []
+
+	n_a = len(agent_xcls)
+	n_x = agent_xcls[0].shape[0]
+	traj_lens = [agent_xcls[i].shape[1] for i in range(n_a)]
+	max_traj_len = np.amax(traj_lens)
+
+	if r_a is None:
+		r_a = [0 for _ in range(n_a)]
+
+	# Pad trajectories so they are all the same length
+	for i in range(n_a):
+		if traj_lens[i] < max_traj_len:
+			n_rep = max_traj_len - traj_lens[i]
+			agent_xcls[i] = np.append(agent_xcls[i], np.tile(agent_xcls[i][:,-1].reshape((n_x,1)), n_rep), axis=1)
+
+	# Solve for new set of exploration constraints
+	for i in range(max_traj_len):
+		A = np.vstack([agent_xcls[j][:2,i] for j in range(n_a)])
+		H_t, g_t = utils.utils.get_agent_polytopes(A, i, traj_lens, r_a)
+		H_cl.append(H_t)
+		g_cl.append(g_t)
+		# pdb.set_trace()
+
+	return (H_cl, g_cl)
 
 def main():
 	plot_dir = '/'.join((BASE_DIR, 'plots'))
@@ -163,12 +170,15 @@ def main():
 	plot_init = False # Plot initial trajectory
 	pause_each_solve = False # Pause on each FTOCP solution
 
+	plot_lims = [[-2.5, 2.5], [-2.5, 2.5]]
+
 	# Number of agents
 	n_a = 2
 	n_x = 4
 	n_u = 2
 
-	r_a = 0.1 # Agents are circles with radius a_r
+	# r_a = 0.1 # Agents are circles with radius r_a
+	r_a = [0.1, 0.2]
 
 	# Define system dynamics and cost for each agent
 	A = [np.nan*np.ones((n_x, n_x)) for _ in range(n_a)]
@@ -242,12 +252,10 @@ def main():
 		xcl_feas[i] = np.append(xcl_feas[i], xf[i], axis=1)
 		ucl_feas[i] = np.append(ucl_feas[i], np.zeros((n_u,1)), axis=1)
 
-
-
 	print('Time elapsed: %g s' % (end - start))
 
 	if plot_init:
-		utils.plot_utils.plot_agent_trajs(xcl_feas, r=r_a, trail=True)
+		utils.plot_utils.plot_agent_trajs(xcl_feas, r_a=r_a, trail=True, plot_lims=plot_lims)
 	# ====================================================================================
 
 	# ====================================================================================
@@ -288,7 +296,7 @@ def main():
 		delta_log.append(deltas)
 		# delta_plot.update(deltas)
 
-		f = utils.plot_utils.plot_agent_trajs(xcls[-1], r=r_a, deltas=None, trail=True)
+		f = utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, deltas=None, trail=True, plot_lims=plot_lims)
 		f.savefig('/'.join((plot_dir, start_time, 'it_%i_trajs.png' % it)))
 
 		x_it = []
