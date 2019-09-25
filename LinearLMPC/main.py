@@ -15,12 +15,14 @@ def main():
 	Q = np.diag([1.0, 1.0]) #np.eye(2)
 	R = 1.0#np.array([[1]])
 
+	print "Computing first feasible trajectory"
+	
 	# Initial Condition
-	x0 = [-10.0, 1];
+	x0 = [-9.0, 1.2];
 
 	# Initialize FTOCP object
 	N_feas = 10
-	ftocp  = FTOCP(N_feas, A, B, 0.1*Q, R)
+	ftocp  = FTOCP(N_feas, A, B, 0.01*Q, R)
 
 	# ====================================================================================
 	# Run simulation to compute feasible solution
@@ -29,11 +31,13 @@ def main():
 	ucl_feasible =[]
 	xt           = x0
 	time         = 0
+
+
 	# time Loop (Perform the task until close to the origin)
 	while np.dot(xt, xt) > 10**(-15):
 		xt = xcl_feasible[time] # Read measurements
 
-		ftocp.solve(xt, verbose = 0) # Solve FTOCP
+		ftocp.solve(xt, verbose = False) # Solve FTOCP
 
 		# Read input and apply it to the system
 		ut = ftocp.uPred[:,0][0]
@@ -45,7 +49,6 @@ def main():
 	print np.round(np.array(ucl_feasible).T, decimals=2)
 	# ====================================================================================
 
-
 	# ====================================================================================
 	# Run LMPC
 	# ====================================================================================
@@ -53,22 +56,23 @@ def main():
 	# Initialize LMPC object
 	N_LMPC = 4 # horizon length
 	ftocp_for_lmpc = FTOCP(N_LMPC, A, B, Q, R) # ftocp solve by LMPC
-	lmpc = LMPC(ftocp_for_lmpc, CVX=True) # Initialize the LMPC decide if you wanna use the CVX hull
+	lmpc = LMPC(ftocp_for_lmpc, CVX=False) # Initialize the LMPC decide if you wanna use the CVX hull
 	lmpc.addTrajectory(xcl_feasible, ucl_feasible) # Add feasible trajectory to the safe set
 	totalIterations = 10 # Number of iterations to perform
 
 	# run simulation
 	# iteration loop
+	print "Starting LMPC"
 	for it in range(0,totalIterations):
-		xcl = [x0] # initialize system state at interation it
+		# Set initial condition at each iteration
+		xcl = [x0] 
 		ucl =[]
-		xt = x0
 		time = 0
 		# time Loop (Perform the task until close to the origin)
-		while np.dot(xt, xt) > 10**(-10):
+		while np.dot(xcl[time], xcl[time]) > 10**(-10):
 			xt = xcl[time] # Read measurements
 
-			lmpc.solve(xt, verbose = 0) # Solve FTOCP
+			lmpc.solve(xt, verbose = False) # Solve FTOCP
 
 			# Read input and apply it to the system
 			ut = lmpc.uPred[:,0][0]
@@ -76,7 +80,6 @@ def main():
 			xcl.append(copy.copy(lmpc.ftocp.model(xcl[time], ut)))
 			time += 1
 
-		# print np.round(np.array(xcl).T, decimals=2) # Uncomment to print trajectory
 		# Add trajectory to update the safe set and value function
 		lmpc.addTrajectory(xcl, ucl)
 
@@ -86,7 +89,7 @@ def main():
 	# ====================================================================================
 	# Compute optimal solution by solving a FTOCP with long horizon
 	# ====================================================================================
-	N = 500 # Set a very long horizon to fake infinite time optimal control problem
+	N = 100 # Set a very long horizon to fake infinite time optimal control problem
 	ftocp_opt = FTOCP(N, A, B, Q, R)
 	ftocp_opt.solve(xcl[0])
 	xOpt = ftocp_opt.xPred

@@ -46,6 +46,23 @@ for i in range(0,it):
 	xcl = np.array(lmpc.SS[i]).T
 	totCost.append(lmpc.Qfun[i][0])
 
+	
+plt.plot(totCost, '-ob', label='Iteration Cost')
+plt.plot([0, it-1], [lmpc.optCost, lmpc.optCost], '--k', label='Optimal cost')
+
+plt.xlabel('$\mathrm{Iteration}$', fontsize=20)
+plt.legend()
+
+# =========================================================
+# Plot iteration cost just LMPC
+# =========================================================
+plt.figure()
+totCost = []
+for i in range(1,it):
+	xcl = np.array(lmpc.SS[i]).T
+	totCost.append(lmpc.Qfun[i][0])
+
+	
 plt.plot(totCost, '-ob', label='Iteration Cost')
 plt.plot([0, it-1], [lmpc.optCost, lmpc.optCost], '--k', label='Optimal cost')
 

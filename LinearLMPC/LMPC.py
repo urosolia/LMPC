@@ -3,6 +3,7 @@ import numpy as np
 from numpy import linalg as la
 import pdb
 import copy
+import itertools
 
 class LMPC(object):
 	"""Learning Model Predictive Controller (LMPC)
@@ -41,7 +42,7 @@ class LMPC(object):
 		# Augment iteration counter and print the cost of the trajectories stored in the safe set
 		self.it = self.it + 1
 		print "Trajectory added to the Safe Set. Current Iteration: ", self.it
-		print "Performance stored trajectories: \n", [self.Qfun[x][0] for x in range(0, self.it)]
+		print "Performance stored trajectories: \n", [self.Qfun[i][0] for i in range(0, self.it)]
 
 	def computeCost(self, x, u):
 		# Compute the cost in a DP like strategy: start from the last point x[len(x)-1] and move backwards
@@ -55,12 +56,16 @@ class LMPC(object):
 		# Finally flip the cost to have correct order
 		return np.flip(cost).tolist()
 
-	def solve(self, xt, verbose = 1):
-		
+	def solve(self, xt, verbose = False):
 
-		# Solve the FTOCP. Here set terminal constraint = ConvHull(self.SS) and terminal cost = BarycentricInterpolation(self.Qfun)
+		# Solve the FTOCP. 
+		# Here set terminal constraint = ConvHull(self.SS) and terminal cost = BarycentricInterpolation(self.Qfun)
 		if self.localSS ==False:
-			self.ftocp.solve(xt, verbose, self.SS, self.Qfun, self.CVX)
+			SS_vector = np.squeeze(list(itertools.chain.from_iterable(self.SS))).T # From a 3D list to a 2D array
+			Qfun_vector = np.expand_dims(np.array(list(itertools.chain.from_iterable(self.Qfun))), 0) # From a 2D list to a 1D array
+			
+			self.ftocp.solve(xt, verbose, SS_vector, Qfun_vector, self.CVX)
+
 		else:
 			# Compute Local SS
 			# Loop for each of the l iterations used to contruct the local safe set
@@ -91,7 +96,7 @@ class LMPC(object):
 			self.zt = xfufNext[0:self.ftocp.n,0]
 
 
-
+		# Update predicted trajectory
 		self.xPred= self.ftocp.xPred
 		self.uPred= self.ftocp.uPred
 

@@ -2,7 +2,6 @@ import numpy as np
 import pdb 
 import scipy
 from cvxpy import *
-import itertools
 
 class FTOCP(object):
 	""" Finite Time Optimal Control Problem (FTOCP)
@@ -29,7 +28,7 @@ class FTOCP(object):
 		self.xPred = []
 		self.uPred = []
 
-	def solve(self, x0, verbose = 0, SS = None, Qfun = None, CVX = None):
+	def solve(self, x0, verbose = False, SS = None, Qfun = None, CVX = None):
 		"""This methos solve a FTOCP given:
 			- x0: initial condition
 			- SS: (optional) contains a set of state and the terminal constraint is ConvHull(SS)
@@ -42,12 +41,10 @@ class FTOCP(object):
 
 		# If SS is given construct a matrix collacting all states and a vector collection all costs
 		if SS is not None:
-			SS_vector = np.squeeze(list(itertools.chain.from_iterable(SS))).T # From a 3D list to a 2D array
-			Qfun_vector = np.expand_dims(np.array(list(itertools.chain.from_iterable(Qfun))), 0) # From a 2D list to a 1D array
 			if CVX == True:
-				lambVar = Variable((SS_vector.shape[1], 1), boolean=False) # Initialize vector of variables
+				lambVar = Variable((SS.shape[1], 1), boolean=False) # Initialize vector of variables
 			else:
-				lambVar = Variable((SS_vector.shape[1], 1), boolean=True) # Initialize vector of variables
+				lambVar = Variable((SS.shape[1], 1), boolean=True) # Initialize vector of variables
 
 		# State Constraints
 		constr = [x[:,0] == x0[:]]
@@ -60,25 +57,31 @@ class FTOCP(object):
 
 		# Terminal Constraint if SS not empty
 		if SS is not None:
-			constr += [SS_vector * lambVar[:,0] == x[:,self.N], # Terminal state \in ConvHull(SS)
-						np.ones((1, SS_vector.shape[1])) * lambVar[:,0] == 1, # Multiplies \lambda sum to 1
+			constr += [SS * lambVar[:,0] == x[:,self.N], # Terminal state \in ConvHull(SS)
+						np.ones((1, SS.shape[1])) * lambVar[:,0] == 1, # Multiplies \lambda sum to 1
 						lambVar >= 0] # Multiplier are positive definite
 
 		# Cost Function
 		cost = 0
 		for i in range(0, self.N):
-			cost += norm(self.Q**0.5*x[:,i])**2 + norm(self.R**0.5*u[:,i])**2 # Running cost h(x,u) = x^TQx + u^TRu
+			# Running cost h(x,u) = x^TQx + u^TRu (you can try to use quad_form, but it does not work ...)
+			cost += quad_form(x[:,i], self.Q) + norm(self.R**0.5*u[:,i])**2
+			# cost += norm(self.Q**0.5*x[:,i])**2 + norm(self.R**0.5*u[:,i])**2
 
 		# Terminal cost if SS not empty
 		if SS is not None:
-			cost += Qfun_vector[0,:] * lambVar[:,0]  # It terminal cost is given by interpolation using \lambda
+			cost += Qfun[0,:] * lambVar[:,0]  # It terminal cost is given by interpolation using \lambda
 		else:
 			cost += norm(self.Q**0.5*x[:,self.N])**2 # If SS is not given terminal cost is quadratic
 
 
 		# Solve the Finite Time Optimal Control Problem
 		problem = Problem(Minimize(cost), constr)
-		problem.solve(verbose=verbose==1)
+		if CVX == True:
+			problem.solve(verbose=verbose, solver=ECOS)
+		else:
+			problem.solve(verbose=verbose)
+
 
 		# Store the open-loop predicted trajectory
 		self.xPred = x.value
