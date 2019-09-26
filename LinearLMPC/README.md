@@ -3,7 +3,7 @@
 This code runs the LMPC from [1] and [2] to solve the following Contratined LQR problem
 
 <p align="center">
-<img src="https://github.com/urosolia/LMPC/LinearLMPC/CLQR.png" width="500" />
+<img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/CLQR.png" width="500" />
 </p>
 
 ## LMPC Key Idea and Files
