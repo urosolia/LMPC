@@ -38,9 +38,10 @@ def get_agent_polytopes(A, abs_t, xf_reached, r_a):
 					rp_idx = np.argwhere(rp == i)[0][0]
 
 					tr_1 = max(0, xf_reached[i]-abs_t)/xf_reached[i] # ratio of remaining trajectory for current agent
-					tr_2 = max(0, xf_reached[pr[1-rp_idx]]-abs_t)/xf_reached[i] # ratio of remaining trajectory for neighbor agent
+					tr_2 = max(0, xf_reached[rp[1-rp_idx]]-abs_t)/xf_reached[i] # ratio of remaining trajectory for neighbor agent
 					# shifted sigmoid between 0 (small t_r) and 1 (large t_r)
-					w = np.exp(20*t_r1-5)/(np.exp(20*t_r1-5)+1)
+					w_1 = np.exp(20*tr_1-5)/(np.exp(20*tr_1-5)+1)
+					w_2 = np.exp(20*tr_2-5)/(np.exp(20*tr_2-5)+1)
 
 					v = [] # Vertices that define the ridge
 					p = [point, vor.points[rp[1-rp_idx]]] # Points that the ridge separates
@@ -50,9 +51,10 @@ def get_agent_polytopes(A, abs_t, xf_reached, r_a):
 
 					conn_vec_p = p[1] - p[0] # Vector from current point to second point
 					conn_vec_l = np.linalg.norm(conn_vec_p, 2) # Length of that vector
+					l = conn_vec_l - 2*(r_a[i] + r_a[rp[1-rp_idx]])
 					# Find parameters a, b that describe the separating line (i.e. a'x + b = 0)
 					ridge_a = conn_vec_p
-					ridge_b = -conn_vec_p.dot(p[0] + w*conn_vec_p/2 - (1-2*w)*r_a[i]*conn_vec_p/conn_vec_l)
+					ridge_b = -conn_vec_p.dot(p[0] + conn_vec_p/2 - r_a[i]*conn_vec_p/conn_vec_l)
 					# Append to inequality matrix and vector
 					H_a.append(ridge_a)
 					g_a.append(ridge_b)
