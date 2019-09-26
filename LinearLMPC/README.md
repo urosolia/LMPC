@@ -2,9 +2,9 @@
 
 This code runs the LMPC from [1] and [2] to solve the following Contratined LQR problem
 
-<!-- <p align="center">
-<img src="https://github.com/urosolia/RacingLMPC/blob/master/src/ClosedLoop.gif" width="500" />
-</p> -->
+<p align="center">
+<img src="https://github.com/urosolia/LMPC/LinearLMPC/CLQR.png" width="500" />
+</p>
 
 ## LMPC Key Idea and Files
 
@@ -20,4 +20,5 @@ We propose to solve the above CLQR problem iteratively. We perform the regulatio
 This code is based on the following:
 
 [1] Ugo Rosolia and Francesco Borrelli. "Learning Model Predictive Control for Iterative Tasks. A Data-Driven Control Framework." In IEEE Transactions on Automatic Control (2017). [PDF](https://ieeexplore.ieee.org/document/8039204/)
+
 [2] Ugo Rosolia and Francesco Borrelli. "Learning Model Predictive Control for Iterative Tasks: A Computationally Efficient Approach for Linear System." IFAC-PapersOnLine 50.1 (2017). [PDF](https://www.sciencedirect.com/science/article/pii/S2405896317306523)
