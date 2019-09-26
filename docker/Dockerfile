@@ -21,6 +21,7 @@ RUN pip install cvxpy pplpy
 
 RUN apt install -y libblas-dev
 RUN pip install ipopt
+RUN pip install casadi
 
 # Two options for command to run
 
