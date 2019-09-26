@@ -1,9 +1,11 @@
-# Start from anaconda image
-FROM continuumio/anaconda:latest
+# Start from python image
+FROM python:2.7.16
 
 # Install python dev and latex libraries
 RUN apt update
-RUN apt install -y python-dev texlive-fonts-recommended texlive-fonts-extra dvipng
+RUN apt install -y texlive-fonts-recommended texlive-fonts-extra dvipng
+RUN apt install -y python-dev python-tk
+RUN apt install -y libmpfr-dev libmpc-dev libppl-dev coinor-libipopt-dev
 
 # Set display environment variable
 ENV QT_X11_NO_MITSHM=1
@@ -12,19 +14,18 @@ ENV QT_X11_NO_MITSHM=1
 RUN mkdir /home/LMPC
 WORKDIR /home/LMPC
 
-# Install jupyter and python-tk (backend for matplotlib.pyplot)
-RUN /opt/conda/bin/conda install -c anaconda jupyter tk -y
-# Install cvxpy and ipopt
-RUN /opt/conda/bin/conda install -c conda-forge cyipopt cvxpy -y
+RUN pip install --upgrade pip
+RUN pip install cython cysignals gmpy2==2.1.0b3
+RUN pip install numpy scipy matplotlib jupyterlab
+RUN pip install cvxpy pplpy
 
-# Delete matplotlib font cache so we can rebuild it later
-RUN fc-cache -f -v
-RUN rm -rf /root/.cache/matplotlib
+RUN apt install -y libblas-dev
+RUN pip install ipopt
 
 # Two options for command to run
 
 # Start jupyter notebook server
-CMD /opt/conda/bin/jupyter notebook --notebook-dir=/home/LMPC --ip=0.0.0.0 --port=8888 --allow-root
+CMD jupyter lab --ip=0.0.0.0 --port=8888 --allow-root
 
 # Keep container open after creation
-#CMD tail -f /dev/null
+# CMD tail -f /dev/null

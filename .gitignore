@@ -2,4 +2,6 @@
 *.pyc
 *.pkl
 *.ipynb
-/.ipynb_checkpoints/
+.ipynb_checkpoints
+Notebooks
+plots
