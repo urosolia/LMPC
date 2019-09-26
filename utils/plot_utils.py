@@ -224,6 +224,9 @@ class lmpc_visualizer(object):
 
 		self.it = 0
 
+	def set_plot_dir(self, plot_dir):
+		self.plot_dir = plot_dir
+
 	def clear_state_plots(self):
 		self.pos_ax.clear()
 		if self.plot_lims is not None:
@@ -284,10 +287,13 @@ class lmpc_visualizer(object):
 
 		# Plot entire previous closed loop trajectory for comparison
 		if self.prev_pos_cl is not None:
+
 			n_a = len(self.prev_pos_cl)
 			c = [matplotlib.cm.get_cmap('jet')(i*(1./(n_a-1))) for i in range(n_a)]
 			for (i, s) in enumerate(self.prev_pos_cl):
+				plot_t = min(t, s.shape[1]-1)
 				self.pos_ax.plot(s[0,:], s[1,:], '.', c=c[i], markersize=1)
+				self.pos_ax.plot(s[0,plot_t], s[1,plot_t], 'o', c=c[i])
 				# self.pos_ax.text(s[0,0]+0.1, s[1,0]+0.1, 'Agent %i' % (i+1), fontsize=12, bbox=dict(facecolor='white', alpha=1.))
 
 			agent_prev_cl = self.prev_pos_cl[self.agent_id]
@@ -340,13 +346,13 @@ class lmpc_visualizer(object):
 		if self.plot_dir is not None:
 			f_name = 'it_%i_time_%i.png' % (self.it, t)
 			if self.agent_id is not None:
-				f_name = '_'.join((('agent_%i' % self.agent_id), f_name))
+				f_name = '_'.join((('agent_%i' % (self.agent_id+1)), f_name))
 			f_name = '_'.join(('pos', f_name))
 			self.pos_fig.savefig('/'.join((self.plot_dir, f_name)))
 
 			f_name = 'it_%i_time_%i.png' % (self.it, t)
 			if self.agent_id is not None:
-				f_name = '_'.join((('agent_%i' % self.agent_id), f_name))
+				f_name = '_'.join((('agent_%i' % (self.agent_id+1)), f_name))
 			f_name = '_'.join(('state', f_name))
 			self.state_fig.savefig('/'.join((self.plot_dir, f_name)))
 
@@ -373,6 +379,6 @@ class lmpc_visualizer(object):
 		if self.plot_dir is not None:
 			f_name = 'it_%i_time_%i.png' % (self.it, t)
 			if self.agent_id is not None:
-				f_name = '_'.join((('agent_%i' % self.agent_id), f_name))
+				f_name = '_'.join((('agent_%i' % (self.agent_id+1)), f_name))
 			f_name = '_'.join(('act', f_name))
 			self.act_fig.savefig('/'.join((self.plot_dir, f_name)))

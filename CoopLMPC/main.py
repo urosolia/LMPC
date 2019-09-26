@@ -6,8 +6,6 @@ import cvxpy as cp
 import scipy as sp
 import scipy.spatial
 import multiprocessing as mp
-import itertools
-import pdb
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -15,8 +13,10 @@ import matplotlib.pyplot as plt
 from matplotlib import rc
 rc('text', usetex=True)
 
-import os, sys, time, copy, pickle
+import os, sys, time, copy, pickle, itertools, pdb
 
+os.environ['TZ'] = 'America/Los_Angeles'
+time.tzset()
 BASE_DIR = os.path.dirname('/'.join(str.split(os.path.realpath(__file__),'/')[:-1]))
 sys.path.append(BASE_DIR)
 
@@ -224,13 +224,13 @@ def main():
 	ucls = [copy.copy(ucl_feas)]
 
 	totalIterations = 20 # Number of iterations to perform
-	start_time = str(time.time())
+	start_time = time.strftime("%Y-%m-%d_%H-%M-%S")
 	exp_dir = '/'.join((plot_dir, start_time))
 	os.makedirs(exp_dir)
 
 	# Initialize objective plots
 	# obj_plot = utils.plot_utils.updateable_plot(n_a, title='Agent Trajectory Costs', x_label='Iteration')
-	lmpc_vis = [utils.plot_utils.lmpc_visualizer(pos_dims=[0,1], n_state_dims=n_x, n_act_dims=n_u, agent_id=i, plot_lims=plot_lims, plot_dir=exp_dir) for i in range(n_a)]
+	lmpc_vis = [utils.plot_utils.lmpc_visualizer(pos_dims=[0,1], n_state_dims=n_x, n_act_dims=n_u, agent_id=i, plot_lims=plot_lims) for i in range(n_a)]
 
 	raw_input('Ready to run LMPC, press enter to continue...')
 
@@ -250,6 +250,11 @@ def main():
 		u_it = []
 		for i in range(n_a):
 			print('Agent %i' % (i+1))
+
+			agent_dir = '/'.join((exp_dir, 'it_%i' % (it+1), 'agent_%i' % (i+1)))
+			os.makedirs(agent_dir)
+			lmpc_vis[i].set_plot_dir(agent_dir)
+
 			# (xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], ball_con=ball_con[i,:], visualizer=lmpc_vis[i], pause=pause_each_solve)
 			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], lin_con=lin_con[i], visualizer=lmpc_vis[i], pause=pause_each_solve, tol=tol)
 			opt_cost = lmpc[i].addTrajectory(xcl, ucl)
