@@ -3,8 +3,13 @@
 This code runs the LMPC from [1] and [2] to solve the following Contratined LQR problem
 
 <p align="center">
-<img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/readmeFigures/CLQR.png" width="300" />
-<img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/readmeFigures/closed-loop.png" width="300" />
+<img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/readmeFigures/CLQR.png" width="500" />
+</p>
+
+The LMPC will improve the closed-loop performance, unitl the closed-loop trajectory will converge to the gloabl optimal solution of the above control problem (the technical contitiodn need for convefcenc are listed in [1] and those depend on the horizon length)
+<p align="center">
+<img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/readmeFigures/CLQR.png" width="400" />
+<img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/readmeFigures/costImprovement.png" width="400" />
 </p>
 
 ## LMPC Key Idea and Files
