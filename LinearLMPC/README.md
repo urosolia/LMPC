@@ -17,7 +17,7 @@ The LMPC will improve the closed-loop performance, unitl the closed-loop traject
 We propose to solve the above CLQR problem iteratively. We perform the regulation task repeatedly and we use the closed-loop data to synthesize the LMPC policy. This folder contains the following files:
 
 1) main.py: this file runs the closed-loop simulations.
-2) LMPC.py: the lmpc object is used to store the file and to construct the the safe set and value function approximation which define the LMPC policy (Set CVX = False t).
+2) LMPC.py: the lmpc object is used to store the file and to construct the the safe set and value function approximation which define the LMPC policy (Set CVX = False for the LMPC from [1] and CVX = True for the LMPC from [2]).
 3) FTOCP.py: the ftocp object solves a finite time optimal control problem given the initial condition x_t, a terminal contraint set (optional) and a terminal cost function (optional)
 4) plot.py: run this files after main.py to plot the closed-loop trajectory, the closed-loop iteration cost and the comparison with the optimal solution to the CLQR problem.
 
