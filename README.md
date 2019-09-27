@@ -7,8 +7,11 @@ This repo collects a few LMPC examples.
 The code is written in Python 2.7 and the following packages are required
 
 ```
+apt install coinor-libipopt-dev
 pip install cvxpy
+apt install -y libblas-dev
 pip install ipopt
+pip intall casadi
 ```
 
 ## Docker Installation
