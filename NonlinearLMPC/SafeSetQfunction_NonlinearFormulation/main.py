@@ -30,9 +30,9 @@ def main():
 
 	# Initialize LMPC object
 	# lmpc = LMPC(ftocp, l=10, P = 200, verbose = False)
-	# lmpc = LMPC(ftocp, l=4, P = 50, verbose = False)
+	lmpc = LMPC(ftocp, l=4, P = 50, verbose = True)
 	# lmpc = LMPC(ftocp, l=3, P = 25, verbose = False)
-	lmpc = LMPC(ftocp, l=1, P = 12, verbose = False)
+	# lmpc = LMPC(ftocp, l=1, P = 12, verbose = True)
 
  	# Add feasible trajectory to the safe set
 	lmpc.addTrajectory(xclFeasible, uclFeasible)

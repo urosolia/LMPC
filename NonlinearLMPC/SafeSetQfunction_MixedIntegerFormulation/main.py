@@ -31,11 +31,11 @@ def main():
 	# Initialize LMPC object
 	safeSetOption = 'timeVarying' # Allowed options are 'timeVarying', 'spaceVarying' and 'all'
 
-	lmpc = LMPC(ftocp, l='all', P='all', safeSetOption='all') # Basically this is the LMPC from the TAC paper as uses all iteration and data points
+	# lmpc = LMPC(ftocp, l='all', P='all', safeSetOption='all') # Basically this is the LMPC from the TAC paper as uses all iteration and data points
 	# lmpc = LMPC(ftocp, l=3, P=40, safeSetOption=safeSetOption) 
 	# lmpc = LMPC(ftocp, l=3, P=16, safeSetOption=safeSetOption) 
 	# lmpc = LMPC(ftocp, l=2, P=10, safeSetOption=safeSetOption)
-	# lmpc = LMPC(ftocp, l=1,  P=8, safeSetOption=safeSetOption)
+	lmpc = LMPC(ftocp, l=1,  P=8, safeSetOption=safeSetOption)
 
  	# Add feasible trajectory to the safe set
 	lmpc.addTrajectory(xclFeasible, uclFeasible)
