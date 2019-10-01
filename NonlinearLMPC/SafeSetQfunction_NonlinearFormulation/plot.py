@@ -118,6 +118,26 @@ plt.legend()
 plt.xlim(0,19)
 plt.ylim(0,6)
 
+
+plt.figure()
+
+plt.subplot(2, 1, 1)	
+ucl = np.loadtxt('storedData/inputIteration'+str(it)+'_P_'+str(P)+'.txt')
+plt.plot(ucl[:,0], '-o', label="LMPC closed-loop for P = "+str(P))
+plt.ylabel('$\mathrm{Steering}$', fontsize=20)
+
+plt.legend()
+
+plt.subplot(2, 1, 2)
+ucl = np.loadtxt('storedData/inputIteration'+str(it)+'_P_'+str(P)+'.txt')
+plt.plot(ucl[:,1], '-o')#, label="LMPC closed-loop for P = "+str(i)+", i="+str(l[counter]))
+
+plt.plot([0,ucl.shape[0]-1],[1,1], '--k', label='Saturation limit')
+plt.plot([0,ucl.shape[0]-1],[-1,-1], '--k')
+plt.xlabel('$\mathrm{Time~Step}$', fontsize=20)
+plt.ylabel('$\mathrm{Acceleration}$', fontsize=20)
+plt.legend()	
+
 # =========================================================
 # Run Comparison
 # =========================================================

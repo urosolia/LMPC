@@ -12,7 +12,7 @@ import datetime
 def main():
 	# Check if a storedData folder exist.	
 	if not os.path.exists('storedData'):
-	    os.makedirs('storedData')
+		os.makedirs('storedData')
 
 	# parameter initialization
 	N = 6 # controller horizon

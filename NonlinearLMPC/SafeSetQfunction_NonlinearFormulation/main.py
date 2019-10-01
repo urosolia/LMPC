@@ -7,8 +7,13 @@ import matplotlib.pyplot as plt
 from tempfile import TemporaryFile
 import copy
 import datetime
+import os
 
-def main():	
+def main():
+	# Check if a storedData folder exist.	
+	if not os.path.exists('storedData'):
+		os.makedirs('storedData')
+
 	# parameter initialization
 	N = 5
 	outfile = TemporaryFile()
