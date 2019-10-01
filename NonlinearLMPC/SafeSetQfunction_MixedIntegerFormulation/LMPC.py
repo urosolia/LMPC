@@ -25,7 +25,7 @@ class LMPC(object):
 		self.P     = P
 		self.zt    = []
 		self.it    = 0
-		self.timeVarying = safeSetOption=='timeVarying' # Tima varying safe set described in new Nonlinear LMPC paper
+		self.safeSetOption = safeSetOption # Tima varying safe set described in new Nonlinear LMPC paper
 		self.itCost = []
 		self.N = ftocp.N
 
@@ -98,7 +98,7 @@ class LMPC(object):
 			# for iteration l compute the set of indices which are closer to zt
 			if self.P =='all':
 				idx = np.arange(0, self.SS[i].shape[1])
-			elif self.timeVarying == True:
+			elif self.safeSetOption == 'timeVarying':
 				idx = self.timeSS(i)
 			else:
 				idx = self.closeToSS(i)

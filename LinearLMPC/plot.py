@@ -62,8 +62,7 @@ for i in range(1,it):
 	xcl = np.array(lmpc.SS[i]).T
 	totCost.append(lmpc.Qfun[i][0])
 
-	
-plt.plot(totCost, '-ob', label='Iteration Cost')
+plt.plot(range(1, it, 1),totCost, '-ob', label='Iteration Cost')
 plt.plot([0, it-1], [lmpc.optCost, lmpc.optCost], '--k', label='Optimal cost')
 
 plt.xlabel('$\mathrm{Iteration}$', fontsize=20)

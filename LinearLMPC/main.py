@@ -22,7 +22,7 @@ def main():
 
 	# Initialize FTOCP object
 	N_feas = 10
-	ftocp  = FTOCP(N_feas, A, B, 0.01*Q, R)
+	ftocp_for_mpc  = FTOCP(N_feas, A, B, 0.01*Q, R)
 
 	# ====================================================================================
 	# Run simulation to compute feasible solution
@@ -32,17 +32,16 @@ def main():
 	xt           = x0
 	time         = 0
 
-
 	# time Loop (Perform the task until close to the origin)
 	while np.dot(xt, xt) > 10**(-15):
 		xt = xcl_feasible[time] # Read measurements
 
-		ftocp.solve(xt, verbose = False) # Solve FTOCP
+		ftocp_for_mpc.solve(xt, verbose = False) # Solve FTOCP
 
 		# Read input and apply it to the system
-		ut = ftocp.uPred[:,0][0]
-		ucl_feasible.append(copy.copy(ut))
-		xcl_feasible.append(copy.copy(ftocp.model(xcl_feasible[time], ut)))
+		ut = ftocp_for_mpc.uPred[:,0][0]
+		ucl_feasible.append(ut)
+		xcl_feasible.append(ftocp_for_mpc.model(xcl_feasible[time], ut))
 		time += 1
 
 	print np.round(np.array(xcl_feasible).T, decimals=2)
@@ -55,9 +54,10 @@ def main():
 
 	# Initialize LMPC object
 	N_LMPC = 4 # horizon length
-	ftocp_for_lmpc = FTOCP(N_LMPC, A, B, Q, R) # ftocp solve by LMPC
-	lmpc = LMPC(ftocp_for_lmpc, CVX=False) # Initialize the LMPC decide if you wanna use the CVX hull
+	ftocp = FTOCP(N_LMPC, A, B, Q, R) # ftocp solved by LMPC
+	lmpc = LMPC(ftocp, CVX=True) # Initialize the LMPC (decide if you wanna use the CVX hull)
 	lmpc.addTrajectory(xcl_feasible, ucl_feasible) # Add feasible trajectory to the safe set
+	
 	totalIterations = 10 # Number of iterations to perform
 
 	# run simulation
@@ -70,14 +70,18 @@ def main():
 		time = 0
 		# time Loop (Perform the task until close to the origin)
 		while np.dot(xcl[time], xcl[time]) > 10**(-10):
-			xt = xcl[time] # Read measurements
+			
+			# Read measurement
+			xt = xcl[time] 
 
-			lmpc.solve(xt, verbose = False) # Solve FTOCP
-
-			# Read input and apply it to the system
+			# Solve FTOCP
+			lmpc.solve(xt, verbose = False) 
+			# Read optimal input
 			ut = lmpc.uPred[:,0][0]
-			ucl.append(copy.copy(ut))
-			xcl.append(copy.copy(lmpc.ftocp.model(xcl[time], ut)))
+
+			# Apply optimal input to the system
+			ucl.append(ut)
+			xcl.append(lmpc.ftocp.model(xcl[time], ut))
 			time += 1
 
 		# Add trajectory to update the safe set and value function
