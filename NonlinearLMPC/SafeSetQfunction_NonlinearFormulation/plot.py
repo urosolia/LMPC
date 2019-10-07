@@ -138,6 +138,15 @@ plt.xlabel('$\mathrm{Time~Step}$', fontsize=20)
 plt.ylabel('$\mathrm{Acceleration}$', fontsize=20)
 plt.legend()	
 
+plt.figure()
+mat = np.loadtxt('storedData/meanTimeLMPC'+'_P_'+str(P)+'.txt')
+compTime = mat[:,0].tolist()
+plt.plot(range(1,len(compTime)+1), compTime, '-o', label='${P =}$'+str(P))		
+
+plt.xlabel('$\mathrm{Iteration~}j$', fontsize=20)
+plt.ylabel('$\mathrm{Mean~Computational~Time~[s]}$', fontsize=20)
+plt.legend()
+
 # =========================================================
 # Run Comparison
 # =========================================================

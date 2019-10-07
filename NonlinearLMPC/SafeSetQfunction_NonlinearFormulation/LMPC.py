@@ -128,8 +128,6 @@ class LMPC(object):
 			self.ftocp.xGuess = np.concatenate((xflatOpenLoop, uflatOpenLoop) , axis = 0)
 
 
-
-
 	def closeToSS(self, it):
 		# TO DO: need to add comments. This function is not used in for time-varying, but for space varying.
 		x = self.SS[it]
