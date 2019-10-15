@@ -3,7 +3,7 @@
 This code runs the LMPC to compute a (local) optimal solution to the following miminum time optimal control problem.
 
 <p align="center">
-<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/SafeSetQfunction_MixedIntegerFormulation/readmeFigures/minimumTimeProblem.png" width="500" />
+<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/DubinsObstacleAvoidance_SampledSafeSet/readmeFigures/minimumTimeProblem.png" width="500" />
 </p>
 
 The optimal solution to the above control problem steers the dubins car from the starting point x_s to the terminal point x_F while avoiding an obstacle and satisfying input constraints. 
@@ -11,8 +11,8 @@ The optimal solution to the above control problem steers the dubins car from the
 The left figure below shows the closed-loop trajectory at convergence, the first feasible trajectory and the stored data from the previous iterations. We notice that the LMPC avoids the obstacle and almost saturates the input acceleration constraints (right figure), as expected from the (local) optimal solution to minimum time optimal control problem.
 
 <p align="center">
-<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/SafeSetQfunction_MixedIntegerFormulation/readmeFigures/iterationEvolution.png" width="420" />
-<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/SafeSetQfunction_MixedIntegerFormulation/readmeFigures/velocityAcceleration.png" width="420" />
+<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/DubinsObstacleAvoidance_SampledSafeSet/readmeFigures/iterationEvolution.png" width="420" />
+<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/DubinsObstacleAvoidance_SampledSafeSet/readmeFigures/velocityAcceleration.png" width="420" />
 </p>
 
 ## LMPC Key Idea and Files
