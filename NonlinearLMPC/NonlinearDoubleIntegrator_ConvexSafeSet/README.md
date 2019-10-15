@@ -9,8 +9,8 @@ This code runs the LMPC to compute a (local) optimal solution to the following m
 The optimal solution to the above control problem steers the nonlinear double integrator from the starting point x_s to the terminal point x_F in minimum time. We initialize the LMPC using the following first feasible trajectory. After few iterations the LMPC converges to a steady-state behavior which saturates the input acceleration constraints, as expected from the (local) optimal solution to minimum time optimal control problem.
 
 <p align="center">
-<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/SafeSetQfunction_NonlinearFormulation/readmeFigures/closedLoopTrajectory.png" width="420" />
-<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/SafeSetQfunction_NonlinearFormulation/readmeFigures/inputAtConvergence.png" width="420" />
+<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/NonlinearDoubleIntegrator_ConvexSafeSet/readmeFigures/closedLoopTrajectory.png" width="420" />
+<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/NonlinearDoubleIntegrator_ConvexSafeSet/readmeFigures/inputAtConvergence.png" width="420" />
 </p>
 
 ## LMPC Key Idea and Files
