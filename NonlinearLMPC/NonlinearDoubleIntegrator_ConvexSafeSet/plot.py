@@ -46,8 +46,8 @@ plt.plot(xcl[0,:], xcl[1,:], 's', color=colorMap[3])
 plt.plot(xcl[0,:], xcl[1,:], '-o', color=colorMap[0], label='LMPC closed-loop at '+str(it)+'th iteration')
 
 
-plt.xlabel('$z$', fontsize=20)
-plt.ylabel('$y$', fontsize=20)
+plt.xlabel('$x$', fontsize=20)
+plt.ylabel('$v$', fontsize=20)
 
 plt.legend()
 print iterationTime
@@ -60,6 +60,7 @@ plt.figure()
 ucl = np.loadtxt('storedData/inputIteration'+str(it)+'_P_'+str(P)+'.txt')
 plt.plot(ucl[:], '-o', color=colorMap[0], label="LMPC closed-loop for P = "+str(P))
 plt.ylabel('$\mathrm{Acceleration}$', fontsize=20)
+plt.xlabel('$\mathrm{Time Step}$', fontsize=20)
 
 plt.legend()
 
