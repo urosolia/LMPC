@@ -7,7 +7,7 @@ This code runs the LMPC to compute a (local) optimal solution to the following m
 </p>
 where
 <p align="center">
-<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/DubinsRacing_ConvexSafeSet/readmeFigures/terminalSet.png" width="500" />
+<img src="https://github.com/urosolia/LMPC/blob/master/NonlinearLMPC/DubinsRacing_ConvexSafeSet/readmeFigures/terminalSet.png" width="400" />
 </p>
 
 The optimal solution to the above control problem steers the dubins car along a curve of radius R, from the starting point x_s to the terminal point x_F in minimum time. We initialize the LMPC using the following first feasible trajectory.

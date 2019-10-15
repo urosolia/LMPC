@@ -89,11 +89,12 @@ plt.plot(pointCircleOutArray[:,0], pointCircleOutArray[:,1], '-', color='C3')
 plt.plot([pointCircleOutArray[0,0], pointCircleInArray[0,0]], [pointCircleOutArray[0,1], pointCircleInArray[0,1]], '-', color='C3')
 plt.plot([pointCircleOutArray[-1,0], pointCircleInArray[-1,0]], [pointCircleOutArray[-1,1], pointCircleInArray[-1,1]], '-', color='C3')
 
-plt.xlabel('$z$', fontsize=20)
-plt.ylabel('$y$', fontsize=20)
+plt.xlabel('$x_{(1)}$', fontsize=20)
+plt.ylabel('$x_{(2)}$', fontsize=20)
 plt.axis('equal')
 
 plt.legend()
+plt.show()
 
 xit = []
 for i in range(it-1,it):
