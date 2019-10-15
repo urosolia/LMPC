@@ -14,6 +14,10 @@ print "Number of points used: ", P
 # =========================================================
 # Plot closed-loop
 # =========================================================
+# 0 = blue, 1 = orange, 2 = green, 3 = red, 4 = purple
+colorMap = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+# colorMap = ["#3182bd", "#fd8d3c", "#31a354", "#e6550d", "#756bb1"]
+
 xFeasible = np.loadtxt('storedData/closedLoopFeasible.txt')
 plt.figure()
 plt.plot(xFeasible[0,:], xFeasible[1,:], '-dk', label='Feasible trajectory')
@@ -26,17 +30,17 @@ for i in range(1,it):
 	xcl = np.loadtxt('storedData/closedLoopIteration'+str(i)+'_P_'+str(P)+'.txt')
 	xcl = xcl.T
 	xit.append(copy.copy(xcl))
-	plt.plot(xcl[0,:], xcl[1,:], 'sr') 
+	plt.plot(xcl[0,:], xcl[1,:], 's', color=colorMap[3]) 
 	iterationTime.append(xcl.shape[1]-1) # Store time to reach xf
 
 
-plt.plot(0, 0, 'sr', label='Stored data')
+plt.plot(0, 0, 's', color=colorMap[3], label='Stored data')
 xcl = np.loadtxt('storedData/closedLoopIteration'+str(it)+'_P_'+str(P)+'.txt')
 xcl = xcl.T
 iterationTime.append(xcl.shape[1]-1) # Store time to reach xf
 xit.append(copy.copy(xcl))
-plt.plot(xcl[0,:], xcl[1,:], 'sr') # Store time to reach xf
-plt.plot(xcl[0,:], xcl[1,:], '-ob', label='LMPC closed-loop at '+str(it)+'th iteration')
+plt.plot(xcl[0,:], xcl[1,:], 's', color=colorMap[3]) # Store time to reach xf
+plt.plot(xcl[0,:], xcl[1,:], '-o', color=colorMap[0], label='LMPC closed-loop at '+str(it)+'th iteration')
 
 print iterationTime
 
@@ -62,11 +66,11 @@ xcl = np.loadtxt('storedData/closedLoopIteration'+str(i)+'_P_'+str(P)+'.txt')
 plt.figure()
 
 plt.subplot(2, 1, 1)
-plt.plot(xcl[:,2], '-ob')
+plt.plot(xcl[:,2], '-o', color=colorMap[0])
 plt.ylabel('$\mathrm{Velocity}$', fontsize=20)
 
 plt.subplot(2, 1, 2)
-plt.plot(ucl[:,1], '-ob')
+plt.plot(ucl[:,1], '-o', color=colorMap[0])
 plt.plot([0,ucl.shape[0]-1],[1,1], '--k', label='Saturation limit')
 plt.plot([0,ucl.shape[0]-1],[-1,-1], '--k')
 plt.xlabel('$\mathrm{Time~Step}$', fontsize=20)
@@ -78,17 +82,17 @@ plt.legend()
 # =========================================================
 xFeasible = np.loadtxt('storedData/closedLoopFeasible.txt')
 plt.figure()
-plt.plot(xFeasible[0,:], xFeasible[2,:], '-dg', label='Feasible trajectory')
+plt.plot(xFeasible[0,:], xFeasible[2,:], '-d', color=colorMap[2], label='Feasible trajectory')
 
 xit = []
 for i in range(1,it+1):
 	xcl = np.loadtxt('storedData/closedLoopIteration'+str(i)+'_P_'+str(P)+'.txt')
 	xcl = xcl.T
 	xit.append(copy.copy(xcl))
-	plt.plot(xcl[0,:], xcl[2,:], 'sr')
-plt.plot(0, 0, 'sr', label='Stored data')
+	plt.plot(xcl[0,:], xcl[2,:], 's', color=colorMap[3])
+plt.plot(0, 0, 's', color=colorMap[3], label='Stored data')
 
-plt.plot(xcl[0,:], xcl[2,:], '-ob', label='LMPC closed-loop')
+plt.plot(xcl[0,:], xcl[2,:], '-o', color=colorMap[0], label='LMPC closed-loop')
 plt.xlabel('$z$', fontsize=20)
 plt.ylabel('$\mathrm{velocity}$', fontsize=20)
 plt.legend()
@@ -101,11 +105,11 @@ ucl = np.loadtxt('storedData/inputIteration'+str(i)+'_P_'+str(P)+'.txt')
 plt.figure()
 
 plt.subplot(2, 1, 1)
-plt.plot(ucl[:,0], '-ob')
+plt.plot(ucl[:,0], '-o')
 plt.ylabel('$\mathrm{Steering}$', fontsize=20)
 
 plt.subplot(2, 1, 2)
-plt.plot(ucl[:,1], '-ob')
+plt.plot(ucl[:,1], '-o')
 plt.plot([0,ucl.shape[0]-1],[1,1], '--k', label='Saturation limit')
 plt.plot([0,ucl.shape[0]-1],[-1,-1], '--k')
 plt.xlabel('$\mathrm{Time~Step}$', fontsize=20)

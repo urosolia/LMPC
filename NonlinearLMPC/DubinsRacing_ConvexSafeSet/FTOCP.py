@@ -14,7 +14,7 @@ class FTOCP(object):
 		- model: given x_t and u_t computes x_{t+1} = Ax_t + Bu_t
 
 	"""
-	def __init__(self, N):
+	def __init__(self, N, roadHalfWidth):
 		# Define variables
 		self.N = N
 		self.n = 3
@@ -22,33 +22,66 @@ class FTOCP(object):
 		self.radius = 10.0
 		self.optCost= np.inf
 		self.dt = 0.5#0.25
+		self.dimSS = []
+		self.roadHalfWidth = roadHalfWidth
 
-	def  set_xf(self, xf):
-		self.xf = xf
+	def set_xf(self, xf):
+		# Set terminal state
+		if xf.shape[1] >1:
+			self.terminalSet = True
+			self.xf_lb = xf[:,0]
+			self.xf_ub = xf[:,1]
+		else:
+			self.terminalSet = False
+			self.xf    = xf[:,0]
+			self.xf_lb = self.xf
+			self.xf_ub = self.xf
+	
+	def checkTaskCompletion(self,x):
+		# Check if the task was completed
+		taskCompletion = False
+		if (self.terminalSet == True) and (self.xf_lb <= x).all() and (x <= self.xf_ub).all():
+			taskCompletion = True
+		elif (self.terminalSet == False) and np.dot(x-self.xf, x-self.xf)<= 1e-8:
+			taskCompletion = True
+
+		return taskCompletion
+
 
 	def solve(self, x0, zt):
 		# Initialize initial guess for lambda
-		lambGuess = np.zeros(self.dimSS+self.n)
+		lambGuess = np.concatenate((np.ones(self.dimSS)/self.dimSS, np.zeros(self.n)), axis = 0)
 		lambGuess[0] = 1
 		self.xGuessTot = np.concatenate( (self.xGuess, lambGuess), axis=0 )
 
 		# Need to solve N+1 ftocp as the stage cost is the indicator function --> try all configuration
 		costSolved = []
 		soluSolved = []
+		slackNorm  = []
 		for i in range(0, self.N+1):
 			if i is not self.N:
 				# Set box constraints on states (here we constraint the last i steps of the horizon to be xf)
-				self.lbx = x0 + [-100, -0.3, -5000]*(self.N-i)+ self.xf.tolist()*i + [-np.pi,-1.0]*self.N + [0]*self.dimSS  + [-1000]*self.n
-				self.ubx = x0 +  [100,  0.3,  5000]*(self.N-i)+ self.xf.tolist()*i + [ np.pi, 1.0]*self.N + [10]*self.dimSS + [1000]*self.n
+				self.lbx = x0 + [-100, -self.roadHalfWidth, -0]*(self.N-i)+ self.xf_lb.tolist()*i + [-2.0,-1.0]*self.N + [0]*self.dimSS  + [-10]*self.n
+				self.ubx = x0 +  [100,  self.roadHalfWidth,  500]*(self.N-i)+ self.xf_ub.tolist()*i + [2.0, 1.0]*self.N + [10]*self.dimSS + [10]*self.n
 
 				# Solve nonlinear programm
 				sol = self.solver(lbx=self.lbx, ubx=self.ubx, lbg=self.lbg_dyanmics, ubg=self.ubg_dyanmics, x0 = self.xGuessTot.tolist())
-			
-				# Check solution flag
-				if self.solver.stats()['success']:
+
+				# Check if the solution is feasible
+				idxSlack = (self.N+1)*self.n + self.d*self.N + self.dimSS
+				self.slack    = sol["x"][idxSlack:idxSlack+self.n]
+				slackNorm.append(np.linalg.norm(self.slack,2))
+				if (self.solver.stats()['success']) and (np.linalg.norm(self.slack,2)< 1e-8):
 					self.feasible = 1
 					# Notice that the cost is given by the cost of the ftocp + the number of steps not constrainted to be xf
-					costSolved.append(sol["f"]+(self.N+1-i))
+					lamb = sol["x"][((self.N+1)*self.n+self.N*self.d):((self.N+1)*self.n + self.d*self.N + self.dimSS)]
+					terminalCost = np.dot(self.costSS, lamb)
+					# costSolved.append(terminalCost+(self.N+1-i))
+					if i == 0:
+						costSolved.append(terminalCost+(self.N-i))
+					else:
+						costSolved.append(terminalCost+(self.N-(i-1)))
+
 					soluSolved.append(sol)
 				else:
 					costSolved.append(np.inf)
@@ -58,7 +91,8 @@ class FTOCP(object):
 			else: # if horizon one time step just check feasibility of the initial guess
 				uGuess = self.xGuess[(self.n*(self.N+1)):(self.n*(self.N+1)+self.d)]
 				xNext  = self.f(x0, uGuess)
-				if np.dot(xNext-self.xf, xNext-self.xf)<= 1e-8:
+				slackNorm.append(0.0)
+				if self.checkTaskCompletion(xNext):
 					self.feasible = 1
 					costSolved.append(1)
 					sol["x"] = self.xGuessTot
@@ -81,15 +115,16 @@ class FTOCP(object):
 		self.xSol = x[0:(self.N+1)*self.n].reshape((self.N+1,self.n)).T
 		self.uSol = x[(self.N+1)*self.n:((self.N+1)*self.n + self.d*self.N)].reshape((self.N,self.d)).T
 		self.lamb = x[((self.N+1)*self.n+self.N*self.d):((self.N+1)*self.n + self.d*self.N + self.dimSS)]
-
+		optSlack = slackNorm[np.argmin(costSolved)]
+		
+		
 		if self.verbose == True:
+			print "Slack Norm: ", optSlack
 			print "Cost Vector:", costSolved, np.argmin(costSolved)
 			print "Optimal Solution:", self.xSol
 
 	def buildNonlinearProgram(self, SSQfun):
 		# Define variables
-		self.n = 3
-		self.d = 2
 		n = self.n
 		d = self.d
 		N = self.N
@@ -101,10 +136,10 @@ class FTOCP(object):
 		costSS = np.array([SSQfun[-1, :]])
 		slack  = SX.sym('X', n);
 
+		self.dimSS = dimSS
 		self.SSQfun = SSQfun
 		self.xSS = xSS
 		self.costSS = costSS
-		self.dimSS = dimSS
 		self.xSS = xSS
 		self.costSS = costSS
 
@@ -120,9 +155,10 @@ class FTOCP(object):
 		constraint = vertcat(constraint, 1 - mtimes(np.ones((1, dimSS )), lamb ) )
 
 		# Defining Cost (We will add stage cost later)
-		cost = mtimes(costSS, lamb) + 10000*(slack[0]**2 + slack[1]**2 + slack[2]**2)
+		cost = mtimes(costSS, lamb) + 1000000**2*(slack[0]**2 + slack[1]**2 + slack[2]**2)
 
 		# Set IPOPT options
+		# opts = {"verbose":False,"ipopt.print_level":0,"print_time":0,"ipopt.mu_strategy":"adaptive","ipopt.mu_init":1e-5,"ipopt.mu_min":1e-15,"ipopt.barrier_tol_factor":1}#, "ipopt.acceptable_constr_viol_tol":0.001}#,"ipopt.acceptable_tol":1e-4}#, "expand":True}
 		opts = {"verbose":False,"ipopt.print_level":0,"print_time":0}#, "ipopt.acceptable_constr_viol_tol":0.001}#,"ipopt.acceptable_tol":1e-4}#, "expand":True}
 		nlp = {'x':vertcat(X,U,lamb,slack), 'f':cost, 'g':constraint}
 		self.solver = nlpsol('solver', 'ipopt', nlp, opts)

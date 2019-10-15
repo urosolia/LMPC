@@ -15,24 +15,25 @@ def main():
 		os.makedirs('storedData')
 
 	# parameter initialization
-	N = 5
+	N = 4
 	outfile = TemporaryFile()
 	ftocp = FTOCP(N=N) # ftocp used by LMPC
 	itMax = 10 # max number of itertions
 	itCounter = 1 # iteration counter 
-	x0 = [0, 0, 0] # initial condition
+	x0 = [-10, 0] # initial condition
 
 
 	# Compute feasible trajectory
-	xclFeasible, uclFeasible = feasTraj(ftocp, 101, ftocp.radius)
+	xclFeasible, uclFeasible = feasTraj(ftocp, 101, x0)
 	print np.round(xclFeasible, decimals=2)
 	np.savetxt('storedData/closedLoopFeasible.txt',xclFeasible.T, fmt='%f' )
+	np.savetxt('storedData/inputFeasible.txt',uclFeasible.T, fmt='%f' )
 
 	# Initialize LMPC object
 	# lmpc = LMPC(ftocp, l=10, P = 200, verbose = False)
-	lmpc = LMPC(ftocp, l=4, P = 50, verbose = True)
-	# lmpc = LMPC(ftocp, l=3, P = 25, verbose = False)
-	# lmpc = LMPC(ftocp, l=1, P = 12, verbose = True)
+	# lmpc = LMPC(ftocp, l=4, P = 50, verbose = False)
+	# lmpc = LMPC(ftocp, l=3, P = 20, verbose = False)
+	lmpc = LMPC(ftocp, l=1, P = 12, verbose = False)
 
  	# Add feasible trajectory to the safe set
 	lmpc.addTrajectory(xclFeasible, uclFeasible)
@@ -96,36 +97,25 @@ def main():
 	
 
 
-def feasTraj(ftocp, timeSteps, radius):
+def feasTraj(ftocp, timeSteps, x0):
 	# Compute first feasible trajectory
 
 	# Intial condition
-	xcl = [np.array([0.0,0.0,0.0])]
+	xcl = [np.array(x0)]
 	ucl =[]
-	u = [0,0]
+	u = [0]
 
 	# Simple brute force hard coded if logic
 	for i in range(0, timeSteps):
 		if i ==0:
-			u[1] =  0.25
-		elif i== 1:
-			u[1] =   0.25
-		elif i== 2:
-			u[1] =   0.25
-		elif i==(timeSteps-4):
-			u[1] =  -0.25
-		elif i==(timeSteps-3):
-			u[1] =  -0.25
-		elif i==(timeSteps-2):
-			u[1] =  -0.25
+			u[0] =  0.5
+		elif xcl[-1][0] + ftocp.dt*xcl[-1][1] == 0:
+			u[0] = -xcl[-1][1]/(ftocp.dt*(1-(xcl[-1][1]/ ftocp.maxV)**2) )
 		else:
-			u[1] = 0   
+			u[0] = 0   
 		
-		u[0] =  xcl[-1][0] / radius;
-
 		xcl.append(ftocp.f(xcl[-1], u))
 		ucl.append(np.array(u))
-
 
 	return np.array(xcl).T[:,:-1], np.array(ucl).T[:,:-1]
 
