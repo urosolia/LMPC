@@ -83,13 +83,17 @@ plt.plot(pointCircleOutArray[:,0], pointCircleOutArray[:,1], '-k')
 s_start = xFeasible[0,-1]
 s_end = xFeasible[0,-1] + 0.5
 pointCircleInArray = computeRoadEdges(s_start, s_end, circleRadius, roadHalfWidth, signEdge=-1, disc = 0.1) # np.array(pointCircleIn)
-plt.plot(pointCircleInArray[:,0], pointCircleInArray[:,1], '-b', label='$\mathcal{X}_F$')
+plt.plot(pointCircleInArray[:,0], pointCircleInArray[:,1], '-', color='C3', label='$\mathcal{X}_F$')
 pointCircleOutArray = computeRoadEdges(s_start, s_end, circleRadius, roadHalfWidth, signEdge=1, disc = 0.1) # np.array(pointCircleOut)
-plt.plot(pointCircleOutArray[:,0], pointCircleOutArray[:,1], '-b')
-plt.plot([pointCircleOutArray[0,0], pointCircleInArray[0,0]], [pointCircleOutArray[0,1], pointCircleInArray[0,1]], '-b')
-plt.plot([pointCircleOutArray[-1,0], pointCircleInArray[-1,0]], [pointCircleOutArray[-1,1], pointCircleInArray[-1,1]], '-b')
+plt.plot(pointCircleOutArray[:,0], pointCircleOutArray[:,1], '-', color='C3')
+plt.plot([pointCircleOutArray[0,0], pointCircleInArray[0,0]], [pointCircleOutArray[0,1], pointCircleInArray[0,1]], '-', color='C3')
+plt.plot([pointCircleOutArray[-1,0], pointCircleInArray[-1,0]], [pointCircleOutArray[-1,1], pointCircleInArray[-1,1]], '-', color='C3')
 
+plt.xlabel('$z$', fontsize=20)
+plt.ylabel('$y$', fontsize=20)
+plt.axis('equal')
 
+plt.legend()
 
 xit = []
 for i in range(it-1,it):
@@ -100,9 +104,9 @@ for i in range(it-1,it):
 		angle  = xcl[0,k]/circleRadius
 		radius = circleRadius- xcl[1,k]
 		xclTot.append([radius*np.sin(angle), circleRadius-radius*np.cos(angle)])
-	plt.plot(np.array(xclTot)[:,0], np.array(xclTot)[:,1], 'sr')
+	# plt.plot(np.array(xclTot)[:,0], np.array(xclTot)[:,1], 's', color='C3')
 
-plt.plot(np.array(xclTot)[:,0], np.array(xclTot)[:,1], '-ob', label='LMPC closed-loop at '+str(it)+'th iteration')
+plt.plot(np.array(xclTot)[:,0], np.array(xclTot)[:,1], '-o', color='C0', label='LMPC closed-loop at '+str(it)+'th iteration')
 
 
 
@@ -140,14 +144,14 @@ plt.figure()
 
 plt.subplot(2, 1, 1)	
 ucl = np.loadtxt('storedData/inputIteration'+str(it)+'_P_'+str(P)+'.txt')
-plt.plot(ucl[:,0], '-o', label="LMPC closed-loop for P = "+str(P))
+plt.plot(ucl[:,0], '-o', color='C0', label="LMPC closed-loop for P = "+str(P))
 plt.ylabel('$\mathrm{Steering}$', fontsize=20)
 
 plt.legend()
 
 plt.subplot(2, 1, 2)
 ucl = np.loadtxt('storedData/inputIteration'+str(it)+'_P_'+str(P)+'.txt')
-plt.plot(ucl[:,1], '-o')#, label="LMPC closed-loop for P = "+str(i)+", i="+str(l[counter]))
+plt.plot(ucl[:,1], '-o', color='C0')#, label="LMPC closed-loop for P = "+str(i)+", i="+str(l[counter]))
 
 plt.plot([0,ucl.shape[0]-1],[1,1], '--k', label='Saturation limit')
 plt.plot([0,ucl.shape[0]-1],[-1,-1], '--k')
