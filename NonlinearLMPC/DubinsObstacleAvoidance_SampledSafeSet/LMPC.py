@@ -16,7 +16,7 @@ class LMPC(object):
 			- solve: uses ftocp and the stored data to comptute the predicted trajectory
 			- closeToSS: computes the K-nearest neighbors to zt"""
 
-	def __init__(self, ftocp, l, P):
+	def __init__(self, ftocp, l, P, safeSetOption = []):
 		self.ftocp = ftocp
 		self.SS    = []
 		self.uSS   = []
@@ -25,7 +25,7 @@ class LMPC(object):
 		self.P     = P
 		self.zt    = []
 		self.it    = 0
-		self.timeVarying = True # Tima varying safe set described in new Nonlinear LMPC paper
+		self.safeSetOption = safeSetOption # Tima varying safe set described in new Nonlinear LMPC paper
 		self.itCost = []
 		self.N = ftocp.N
 
@@ -96,10 +96,10 @@ class LMPC(object):
 		for i in range(minIt, self.it):
 
 			# for iteration l compute the set of indices which are closer to zt
-			if self.timeVarying == True:
+			if self.P =='all':
+				idx = np.arange(0, self.SS[i].shape[1])
+			elif self.safeSetOption == 'timeVarying':
 				idx = self.timeSS(i)
-				# Adding new state to SS so that we try to solve the FTOCP with shorter horizon 
-				# idx = np.concatenate((np.arange(idx[0]-self.ftocp.N, idx[0]), idx))
 			else:
 				idx = self.closeToSS(i)
 

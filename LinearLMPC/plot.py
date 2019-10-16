@@ -32,7 +32,7 @@ i = it-1
 xcl = np.array(lmpc.SS[i]).T
 plt.plot(xcl[0,:], xcl[1,:], '-ob', label='LMPC closed-loop')
 plt.plot(lmpc.xOpt[0,:], lmpc.xOpt[1,:], '--*k', label='Optimal trajectory')
-plt.legend()
+plt.legend(fontsize=16)
 
 plt.xlabel('$x_1$', fontsize=20)
 plt.ylabel('$x_2$', fontsize=20)
@@ -51,7 +51,7 @@ plt.plot(totCost, '-ob', label='Iteration Cost')
 plt.plot([0, it-1], [lmpc.optCost, lmpc.optCost], '--k', label='Optimal cost')
 
 plt.xlabel('$\mathrm{Iteration}$', fontsize=20)
-plt.legend()
+plt.legend(fontsize=16)
 
 # =========================================================
 # Plot iteration cost just LMPC
@@ -62,12 +62,11 @@ for i in range(1,it):
 	xcl = np.array(lmpc.SS[i]).T
 	totCost.append(lmpc.Qfun[i][0])
 
-	
-plt.plot(totCost, '-ob', label='Iteration Cost')
+plt.plot(range(1, it, 1),totCost, '-ob', label='Iteration Cost')
 plt.plot([0, it-1], [lmpc.optCost, lmpc.optCost], '--k', label='Optimal cost')
 
 plt.xlabel('$\mathrm{Iteration}$', fontsize=20)
-plt.legend()
+plt.legend(fontsize=16)
 
 print "Percentage deviation: ", np.abs((lmpc.optCost-totCost[-1])/lmpc.optCost)*100
 

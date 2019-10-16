@@ -6,11 +6,20 @@ import pdb
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=True)
 
+def computeRoadEdges(s_start, s_end, circleRadius, roadHalfWidth, signEdge = 1, disc = 1):
+	edges = []
+	for k in np.arange(s_start, s_end+disc, disc):#in range(s_start*disc, s_end*disc):
+		angle  = k/circleRadius
+		radius = circleRadius  + signEdge * roadHalfWidth
+		edges.append([radius*np.sin(angle), circleRadius-radius*np.cos(angle)])
+
+	return np.array(edges)
 
 it = 10
 iterationTime = []
 circleRadius = 10.0
-P = 12
+P = 15
+roadHalfWidth = 2.0
 print "Current value of P = ",P
 # a = raw_input("Pick Value of a = ")
 
@@ -59,20 +68,33 @@ feasibleTraj = []
 for k in range(0, np.shape(xFeasible)[1]):
 	angle  = xFeasible[0,k]/circleRadius
 	radius = circleRadius  - xFeasible[1,k]
-	radiusIn  = circleRadius - 0.3
-	radiusOut = circleRadius + 0.3
-	pointCircleIn.append([radiusIn*np.sin(angle), circleRadius-radiusIn*np.cos(angle)])
-	pointCircleOut.append([radiusOut*np.sin(angle), circleRadius-radiusOut*np.cos(angle)])
-
 	feasibleTraj.append([radius*np.sin(angle), circleRadius-radius*np.cos(angle)])
 
 plt.plot(np.array(feasibleTraj)[:,0], np.array(feasibleTraj)[:,1], '-dg', label='Feasible trajectory')
 	
-pointCircleInArray = np.array(pointCircleIn)
+
+s_start = 0
+s_end = xFeasible[0,-1]
+pointCircleInArray = computeRoadEdges(s_start, s_end, circleRadius, roadHalfWidth, signEdge=-1, disc = 0.1) # np.array(pointCircleIn)
 plt.plot(pointCircleInArray[:,0], pointCircleInArray[:,1], '-k', label='Road Boundaries')
-pointCircleOutArray = np.array(pointCircleOut)
+pointCircleOutArray = computeRoadEdges(s_start, s_end, circleRadius, roadHalfWidth, signEdge=1, disc = 0.1) # np.array(pointCircleOut)
 plt.plot(pointCircleOutArray[:,0], pointCircleOutArray[:,1], '-k')
 
+s_start = xFeasible[0,-1]
+s_end = xFeasible[0,-1] + 0.5
+pointCircleInArray = computeRoadEdges(s_start, s_end, circleRadius, roadHalfWidth, signEdge=-1, disc = 0.1) # np.array(pointCircleIn)
+plt.plot(pointCircleInArray[:,0], pointCircleInArray[:,1], '-', color='C3', label='$\mathcal{X}_F$')
+pointCircleOutArray = computeRoadEdges(s_start, s_end, circleRadius, roadHalfWidth, signEdge=1, disc = 0.1) # np.array(pointCircleOut)
+plt.plot(pointCircleOutArray[:,0], pointCircleOutArray[:,1], '-', color='C3')
+plt.plot([pointCircleOutArray[0,0], pointCircleInArray[0,0]], [pointCircleOutArray[0,1], pointCircleInArray[0,1]], '-', color='C3')
+plt.plot([pointCircleOutArray[-1,0], pointCircleInArray[-1,0]], [pointCircleOutArray[-1,1], pointCircleInArray[-1,1]], '-', color='C3')
+
+plt.xlabel('$x_{(1)}$', fontsize=20)
+plt.ylabel('$x_{(2)}$', fontsize=20)
+plt.axis('equal')
+
+plt.legend()
+plt.show()
 
 xit = []
 for i in range(it-1,it):
@@ -83,9 +105,9 @@ for i in range(it-1,it):
 		angle  = xcl[0,k]/circleRadius
 		radius = circleRadius- xcl[1,k]
 		xclTot.append([radius*np.sin(angle), circleRadius-radius*np.cos(angle)])
-	plt.plot(np.array(xclTot)[:,0], np.array(xclTot)[:,1], 'sr')
+	# plt.plot(np.array(xclTot)[:,0], np.array(xclTot)[:,1], 's', color='C3')
 
-plt.plot(np.array(xclTot)[:,0], np.array(xclTot)[:,1], '-ob', label='LMPC closed-loop at '+str(it)+'th iteration')
+plt.plot(np.array(xclTot)[:,0], np.array(xclTot)[:,1], '-o', color='C0', label='LMPC closed-loop at '+str(it)+'th iteration')
 
 
 
@@ -118,6 +140,35 @@ plt.legend()
 plt.xlim(0,19)
 plt.ylim(0,6)
 
+
+plt.figure()
+
+plt.subplot(2, 1, 1)	
+ucl = np.loadtxt('storedData/inputIteration'+str(it)+'_P_'+str(P)+'.txt')
+plt.plot(ucl[:,0], '-o', color='C0', label="LMPC closed-loop for P = "+str(P))
+plt.ylabel('$\mathrm{Steering}$', fontsize=20)
+
+plt.legend()
+
+plt.subplot(2, 1, 2)
+ucl = np.loadtxt('storedData/inputIteration'+str(it)+'_P_'+str(P)+'.txt')
+plt.plot(ucl[:,1], '-o', color='C0')#, label="LMPC closed-loop for P = "+str(i)+", i="+str(l[counter]))
+
+plt.plot([0,ucl.shape[0]-1],[1,1], '--k', label='Saturation limit')
+plt.plot([0,ucl.shape[0]-1],[-1,-1], '--k')
+plt.xlabel('$\mathrm{Time~Step}$', fontsize=20)
+plt.ylabel('$\mathrm{Acceleration}$', fontsize=20)
+plt.legend()	
+
+plt.figure()
+mat = np.loadtxt('storedData/meanTimeLMPC'+'_P_'+str(P)+'.txt')
+compTime = mat[:,0].tolist()
+plt.plot(range(1,len(compTime)+1), compTime, '-o', label='${P =}$'+str(P))		
+
+plt.xlabel('$\mathrm{Iteration~}j$', fontsize=20)
+plt.ylabel('$\mathrm{Mean~Computational~Time~[s]}$', fontsize=20)
+plt.legend()
+
 # =========================================================
 # Run Comparison
 # =========================================================
@@ -127,7 +178,7 @@ input = raw_input("Do you want to run comparison for different values of P and l
 # Plot inputs
 # =========================================================
 l = [1, 2,3, 10]
-P = [12,25,50,200]
+P = [15,20,50,200]
 if input == 'y':
 	i = it
 	plt.figure()
@@ -162,8 +213,8 @@ if input == 'y':
 	for k in range(0, np.shape(xFeasible)[1]):
 		angle  = xFeasible[0,k]/circleRadius
 		radius = circleRadius  - xFeasible[1,k]
-		radiusIn  = circleRadius - 0.3
-		radiusOut = circleRadius + 0.3
+		radiusIn  = circleRadius - roadHalfWidth
+		radiusOut = circleRadius + roadHalfWidth
 		pointCircleIn.append([radiusIn*np.sin(angle), circleRadius-radiusIn*np.cos(angle)])
 		pointCircleOut.append([radiusOut*np.sin(angle), circleRadius-radiusOut*np.cos(angle)])
 
@@ -188,6 +239,7 @@ if input == 'y':
 		xclTotArray = np.array(xclTot)
 		plt.plot(xclTotArray[:,0], xclTotArray[:,1], '-o', label="LMPC closed-loop for P = "+str(P[i])+", i="+str(l[i]))
 
+
 	plt.xlabel('$x$', fontsize=20)
 	plt.ylabel('$y$', fontsize=20)
 
@@ -201,8 +253,8 @@ if input == 'y':
 	for k in range(0, np.shape(xFeasible)[1]):
 		angle  = xFeasible[0,k]/circleRadius
 		radius = circleRadius  - xFeasible[1,k]
-		radiusIn  = circleRadius - 0.3
-		radiusOut = circleRadius + 0.3
+		radiusIn  = circleRadius - roadHalfWidth
+		radiusOut = circleRadius + roadHalfWidth
 		pointCircleIn.append([radiusIn*np.sin(angle), circleRadius-radiusIn*np.cos(angle)])
 		pointCircleOut.append([radiusOut*np.sin(angle), circleRadius-radiusOut*np.cos(angle)])
 
@@ -214,6 +266,15 @@ if input == 'y':
 	plt.plot(pointCircleInArray[:,0], pointCircleInArray[:,1], '-k', label='Road Boundaries')
 	pointCircleOutArray = np.array(pointCircleOut)
 	plt.plot(pointCircleOutArray[:,0], pointCircleOutArray[:,1], '-k')	
+
+	s_start = xFeasible[0,-1]
+	s_end = xFeasible[0,-1] + 0.5
+	pointCircleInArray = computeRoadEdges(s_start, s_end, circleRadius, roadHalfWidth, signEdge=-1, disc = 0.1) # np.array(pointCircleIn)
+	plt.plot(pointCircleInArray[:,0], pointCircleInArray[:,1], '--', color="k", label='$\mathcal{X}_F$')
+	pointCircleOutArray = computeRoadEdges(s_start, s_end, circleRadius, roadHalfWidth, signEdge=1, disc = 0.1) # np.array(pointCircleOut)
+	plt.plot(pointCircleOutArray[:,0], pointCircleOutArray[:,1], '--', color="k",)
+	plt.plot([pointCircleOutArray[0,0], pointCircleInArray[0,0]], [pointCircleOutArray[0,1], pointCircleInArray[0,1]], '--', color="k",)
+	plt.plot([pointCircleOutArray[-1,0], pointCircleInArray[-1,0]], [pointCircleOutArray[-1,1], pointCircleInArray[-1,1]], '--', color="k",)
 
 	for i in range(0, len(P)):
 		xcl = np.loadtxt('storedData/closedLoopIteration'+str(it)+'_P_'+str(P[i])+'.txt')

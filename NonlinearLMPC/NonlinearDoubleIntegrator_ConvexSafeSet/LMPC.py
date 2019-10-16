@@ -35,7 +35,7 @@ class LMPC(object):
 	def addTrajectory(self, x, u):
 		# Add the feasible trajectory x and the associated input sequence u to the safe set
 		self.SS.append(copy.copy(x))
-		self.uSS.append(np.concatenate( (copy.copy(u), np.zeros((2,1)) ), axis=1)) # Here concatenating zero as f(xf, 0) = xf by assumption
+		self.uSS.append(np.concatenate( (copy.copy(u), np.zeros((u.shape[0],1)) ), axis=1)) # Here concatenating zero as f(xf, 0) = xf by assumption
 
 		# Compute and store the cost associated with the feasible trajectory
 		self.Qfun.append(copy.copy(np.arange(x.shape[1]-1,-1,-1)))
@@ -126,10 +126,7 @@ class LMPC(object):
 			xflatOpenLoop  = np.concatenate( (self.ftocp.xSol[:,1:(self.ftocp.N+1)].T.flatten(), xfufNext[0:self.ftocp.n,0]), axis = 0)
 			uflatOpenLoop  = np.concatenate( (self.ftocp.uSol[:,1:(self.ftocp.N)].T.flatten()  , xfufNext[self.ftocp.n:(self.ftocp.n+self.ftocp.d),0]), axis = 0)
 			self.ftocp.xGuess = np.concatenate((xflatOpenLoop, uflatOpenLoop) , axis = 0)
-
-
-
-
+			
 	def closeToSS(self, it):
 		# TO DO: need to add comments. This function is not used in for time-varying, but for space varying.
 		x = self.SS[it]
