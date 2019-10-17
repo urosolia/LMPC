@@ -72,14 +72,26 @@ def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visuali
 	n_x = lmpc.ftocp.n
 	n_u = lmpc.ftocp.d
 
+	x_pred_log = []
+	u_pred_log = []
+
 	xcl = x0 # initialize system state at interation it
 	ucl = np.empty((n_u,0))
+
+	debug = False
 
 	t = 0
 	# time Loop (Perform the task until close to the origin)
 	while True:
 		xt = xcl[:,t] # Read measurements
 		(x_pred, u_pred) = lmpc.solve(xt, xf=xf, abs_t=t, ball_con=ball_con, lin_con=lin_con, verbose=verbose) # Solve FTOCP
+		# Go into debug mode
+		if x_pred is None or u_pred is None:
+			utils.utils.traj_inspector(visualizer, t, xcl, x_pred_log, u_pred_log, lin_con, ball_con)
+			sys.exit()
+		else:
+			x_pred_log.append(x_pred)
+			u_pred_log.append(u_pred)
 
 		if visualizer is not None:
 			visualizer.plot_state_traj(xcl, x_pred, t, ball_con=ball_con, lin_con=lin_con, shade=True)
@@ -102,6 +114,9 @@ def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visuali
 			raw_input('Iteration %i. Press enter to continue: ' % t)
 
 		t += 1
+
+	if debug:
+		utils.utils.traj_inspector(visualizer, t, xcl, x_pred_log, u_pred_log, lin_con, ball_con)
 
 	# print np.round(np.array(xcl).T, decimals=2) # Uncomment to print trajectory
 	# Add trajectory to update the safe set and value function

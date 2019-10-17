@@ -155,10 +155,21 @@ class FTOCP(object):
 		problem = cp.Problem(cp.Minimize(cost), constr)
 		problem.solve(verbose=verbose)
 
-		if problem.status == 'infeasible':
-			raise(ValueError('Optimization was infeasible for step %i' % abs_t))
-		elif problem.status == 'unbounded':
-			raise(ValueError('Optimization was unbounded for step %i' % abs_t))
+		if problem.status != cp.OPTIMAL:
+			if problem.status == cp.INFEASIBLE:
+				print('Optimization was infeasible for step %i' % abs_t)
+			elif problem.status == cp.UNBOUNDED:
+				print('Optimization was unbounded for step %i' % abs_t)
+			elif problem.status == cp.INFEASIBLE_INACCURATE:
+				print('Optimization was infeasible inaccurate for step %i' % abs_t)
+			elif problem.status == cp.UNBOUNDED_INACCURATE:
+				print('Optimization was unbounded inaccurate for step %i' % abs_t)
+			elif problem.status == cp.OPTIMAL_INACCURATE:
+				print('Optimization was optimal inaccurate for step %i' % abs_t)
+
+			pdb.set_trace()
+			# sys.exit()
+			return (None, None)
 
 		if SS is not None:
 			if cost.value > self.costFTOCP:
@@ -168,6 +179,11 @@ class FTOCP(object):
 				# pdb.set_trace()
 
 			self.costFTOCP = cost.value
+
+		if x.value is None or u.value is None:
+			print('Optimization variables returned None')
+			print(problem.status)
+			pdb.set_trace()
 
 		return(x.value, u.value)
 

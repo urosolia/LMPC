@@ -188,3 +188,40 @@ def get_traj_lin_con(agent_xcls, xf, r_a=None, tol=-7):
 		# pdb.set_trace()
 
 	return zip(H_cl, g_cl)
+
+def traj_inspector(visualizer, start_t, xcl, x_preds, u_preds, lin_con=None, ball_con=None):
+	t = start_t
+	if lin_con is not None:
+		max_time = len(lin_con[0])-1
+	elif ball_con is not None:
+		max_time = len(ball_con)-1
+	else:
+		max_time = xcl.shape[1]
+
+	print('t = %i' % t)
+	# visualizer.plot_state_traj(xcl, x_preds[-1], t, ball_con=ball_con, lin_con=lin_con, shade=True)
+
+	print('Press q to exit, f/b to move forward/backwards through iteration time steps')
+	while True:
+		input = raw_input('(debug) ')
+		if input == 'q':
+			break
+		elif input == 'f':
+			if t == max_time:
+				print('End reached')
+				continue
+			else:
+				t += 1
+				print('t = %i' % t)
+				visualizer.plot_state_traj(xcl[:,:min(t,start_t)], x_preds[min(t,start_t-1)], t, ball_con=ball_con, lin_con=lin_con, shade=True)
+		elif input == 'b':
+			if t == 0:
+				print('Start reached')
+				continue
+			else:
+				t -= 1
+				print('t = %i' % t)
+				visualizer.plot_state_traj(xcl[:,:min(t,start_t)], x_preds[min(t,start_t-1)], t, ball_con=ball_con, lin_con=lin_con, shade=True)
+		else:
+			print('Input not recognized')
+			print('Press q to exit, f/b to move forward/backwards through iteration time steps')
