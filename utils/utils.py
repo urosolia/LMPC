@@ -82,7 +82,14 @@ def get_agent_polytopes(A, abs_t, xf_reached, r_a):
 
 	return H_t, g_t
 
+# Solve linear program to get pair-wise distances between points
 def get_agent_distances(A, abs_t, xf_reached, r_a):
+	"""
+	- A: agent states at abs_t (num_agents, dimension)
+	- abs_t: absolute timestep
+	- xf_reached: flags for agent trajectory completion (num_agents,)
+	- r_a: agent radius (num_agens,)
+	"""
 	n_a = A.shape[0]
 
 	if n_a == 1:
@@ -119,7 +126,8 @@ def get_agent_distances(A, abs_t, xf_reached, r_a):
 
 	return d.value
 
-def get_traj_ball_con(agent_xcls, xf, r_a=None, tol=-7):
+# Get ellipsoidal exploration constraints
+def get_traj_ell_con(agent_xcls, xf, r_a=None, tol=-7):
 	ball_con = []
 	n_a = len(agent_xcls)
 
@@ -153,6 +161,7 @@ def get_traj_ball_con(agent_xcls, xf, r_a=None, tol=-7):
 
 	return ball_con
 
+# Get linear exploration constraints using Voronoi graphs
 def get_traj_lin_con(agent_xcls, xf, r_a=None, tol=-7):
 	n_a = len(agent_xcls)
 
@@ -189,23 +198,26 @@ def get_traj_lin_con(agent_xcls, xf, r_a=None, tol=-7):
 
 	return zip(H_cl, g_cl)
 
-def traj_inspector(visualizer, start_t, xcl, x_preds, u_preds, lin_con=None, ball_con=None):
+# A tool for inspecting the trajectory at an iteration, when this function is called, the program will enter into a while loop which waits for user input to inspect the trajectory
+def traj_inspector(visualizer, start_t, xcl, x_preds, u_preds, expl_con=None):
 	t = start_t
-	if lin_con is not None:
-		max_time = len(lin_con[0])-1
-	elif ball_con is not None:
-		max_time = len(ball_con)-1
-	else:
-		max_time = xcl.shape[1]
+
+	# Get the max time of the trajectory
+	end_times = [xcl_shape[1]-1]
+	if expl_con is not None and 'lin' in expl_con:
+		end_times.append(len(lin_con[0])-1)
+	if expl_con is not None and 'ell' in expl_con:
+		end_times.append(len(ball_con)-1)
+	max_time = np.amax(end_times)
 
 	print('t = %i' % t)
-	# visualizer.plot_state_traj(xcl, x_preds[-1], t, ball_con=ball_con, lin_con=lin_con, shade=True)
-
 	print('Press q to exit, f/b to move forward/backwards through iteration time steps')
 	while True:
 		input = raw_input('(debug) ')
+		# Quit inspector
 		if input == 'q':
 			break
+		# Move forward 1 time step
 		elif input == 'f':
 			if t == max_time:
 				print('End reached')
@@ -213,7 +225,8 @@ def traj_inspector(visualizer, start_t, xcl, x_preds, u_preds, lin_con=None, bal
 			else:
 				t += 1
 				print('t = %i' % t)
-				visualizer.plot_state_traj(xcl[:,:min(t,start_t)], x_preds[min(t,start_t-1)], t, ball_con=ball_con, lin_con=lin_con, shade=True)
+				visualizer.plot_state_traj(xcl[:,:min(t,start_t)], x_preds[min(t,start_t-1)], t, expl_con=expl_con, shade=True)
+		# Move backward 1 time step
 		elif input == 'b':
 			if t == 0:
 				print('Start reached')
@@ -221,7 +234,7 @@ def traj_inspector(visualizer, start_t, xcl, x_preds, u_preds, lin_con=None, bal
 			else:
 				t -= 1
 				print('t = %i' % t)
-				visualizer.plot_state_traj(xcl[:,:min(t,start_t)], x_preds[min(t,start_t-1)], t, ball_con=ball_con, lin_con=lin_con, shade=True)
+				visualizer.plot_state_traj(xcl[:,:min(t,start_t)], x_preds[min(t,start_t-1)], t, expl_con=expl_con, shade=True)
 		else:
 			print('Input not recognized')
 			print('Press q to exit, f/b to move forward/backwards through iteration time steps')

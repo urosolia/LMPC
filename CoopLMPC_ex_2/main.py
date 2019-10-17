@@ -68,7 +68,7 @@ def solve_init_traj(ftocp, x0, waypt, xf, tol=-7):
 
 	return (xcl_feas, ucl_feas)
 
-def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visualizer=None, pause=False, tol=-7):
+def solve_lmpc(lmpc, x0, xf, expl_con=None, verbose=False, visualizer=None, pause=False, tol=-7):
 	n_x = lmpc.ftocp.n
 	n_u = lmpc.ftocp.d
 
@@ -78,26 +78,24 @@ def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visuali
 	xcl = x0 # initialize system state at interation it
 	ucl = np.empty((n_u,0))
 
-	debug = False
+	inspect = False
 
 	t = 0
 	# time Loop (Perform the task until close to the origin)
 	while True:
 		xt = xcl[:,t] # Read measurements
-		(x_pred, u_pred) = lmpc.solve(xt, xf=xf, abs_t=t, ball_con=ball_con, lin_con=lin_con, verbose=verbose) # Solve FTOCP
-		# Go into debug mode
+		(x_pred, u_pred) = lmpc.solve(xt, xf=xf, abs_t=t, expl_con=expl_con, verbose=verbose) # Solve FTOCP
+		# Inspect incomplete trajectory
 		if x_pred is None or u_pred is None:
-			utils.utils.traj_inspector(visualizer, t, xcl, x_pred_log, u_pred_log, lin_con, ball_con)
+			utils.utils.traj_inspector(visualizer, t, xcl, x_pred_log, u_pred_log, expl_con)
 			sys.exit()
 		else:
 			x_pred_log.append(x_pred)
 			u_pred_log.append(u_pred)
 
 		if visualizer is not None:
-			visualizer.plot_state_traj(xcl, x_pred, t, ball_con=ball_con, lin_con=lin_con, shade=True)
+			visualizer.plot_state_traj(xcl, x_pred, t, expl_con=expl_con, shade=True)
 			visualizer.plot_act_traj(ucl, u_pred, t)
-
-		# pdb.set_trace()
 
 		# Read input and apply it to the system
 		ut = u_pred[:,0].reshape((n_u, 1))
@@ -115,12 +113,11 @@ def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visuali
 
 		t += 1
 
-	if debug:
-		utils.utils.traj_inspector(visualizer, t, xcl, x_pred_log, u_pred_log, lin_con, ball_con)
+	# Inspection mode after iteration completion
+	if inspect:
+		utils.utils.traj_inspector(visualizer, t, xcl, x_pred_log, u_pred_log, expl_con)
 
 	# print np.round(np.array(xcl).T, decimals=2) # Uncomment to print trajectory
-	# Add trajectory to update the safe set and value function
-	# lmpc.addTrajectory(xcl, ucl)
 	return xcl, ucl
 
 def main():
@@ -281,7 +278,7 @@ def main():
 		for lv in lmpc_vis:
 			lv.update_prev_trajs(state_traj=xcls[-1], act_traj=ucls[-1])
 
-		# ball_con = utils.utils.get_traj_ball_con(xcls[-1], xf, r_a=r_a) # Compute ball_con with last trajectory
+		# ball_con = utils.utils.get_traj_ell_con(xcls[-1], xf, r_a=r_a) # Compute ball_con with last trajectory
 		lin_con = utils.utils.get_traj_lin_con(xcls[-1], xf, r_a=r_a)
 
 		f = utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims)
@@ -290,6 +287,7 @@ def main():
 
 		x_it = []
 		u_it = []
+		# agent loop
 		for i in range(n_a):
 			print('Agent %i' % (i+1))
 
@@ -297,7 +295,8 @@ def main():
 			os.makedirs(agent_dir)
 			lmpc_vis[i].set_plot_dir(agent_dir)
 
-			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], lin_con=lin_con[i], visualizer=lmpc_vis[i], pause=pause_each_solve, tol=tol)
+			expl_con = {'lin' : lin_con[i]}
+			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], expl_con = expl_con, visualizer=lmpc_vis[i], pause=pause_each_solve, tol=tol)
 			opt_cost = lmpc[i].addTrajectory(xcl, ucl)
 			# obj_plot.update(np.array([it, opt_cost]).T, i)
 			x_it.append(xcl)

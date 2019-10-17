@@ -268,8 +268,13 @@ class lmpc_visualizer(object):
 
 		self.it += 1
 
-	def plot_state_traj(self, state_cl, state_preds, t, ball_con=None, lin_con=None, shade=False):
+	def plot_state_traj(self, state_cl, state_preds, t, expl_con=None, shade=False):
 		self.clear_state_plots()
+
+		if expl_con is not None and 'lin' in expl_con:
+			lin_con = expl_con['lin']
+		if expl_con is not None and 'ell' in expl_con:
+			ell_con = expl_con['ell']
 
 		if shade:
 			p1 = np.linspace(self.plot_lims[0][0], self.plot_lims[0][1], 15)
@@ -298,13 +303,13 @@ class lmpc_visualizer(object):
 
 			agent_prev_cl = self.prev_pos_cl[self.agent_id]
 
-			# Plot the ball constraint
-			if ball_con is not None:
+			# Plot the ellipsoidal constraint
+			if expl_con is not None and 'ell' in expl_con:
 				for i in range(t, t+pred_len):
 					plot_t = min(i, agent_prev_cl.shape[1]-1)
-					self.pos_ax.plot(agent_prev_cl[0,plot_t]+ball_con[plot_t]*np.cos(np.linspace(0,2*np.pi,100)),
-						agent_prev_cl[1,plot_t]+ball_con[plot_t]*np.sin(np.linspace(0,2*np.pi,100)), '--', linewidth=0.7, c=c_pred[i-t])
-			if lin_con is not None:
+					self.pos_ax.plot(agent_prev_cl[0,plot_t]+ell_con[plot_t]*np.cos(np.linspace(0,2*np.pi,100)),
+						agent_prev_cl[1,plot_t]+ell_con[plot_t]*np.sin(np.linspace(0,2*np.pi,100)), '--', linewidth=0.7, c=c_pred[i-t])
+			if expl_con is not None and 'lin' in expl_con:
 				boundary_x = np.linspace(self.plot_lims[0][0], self.plot_lims[0][1], 50)
 				# for i in range(t, t+pred_len):
 				for i in range(t+pred_len-1, t-1, -1): # Go backwards so that earlier stuff is plotted on top
