@@ -168,11 +168,11 @@ class FTOCP(object):
 			pdb.set_trace()
 			return (None, None)
 
-		if SS is not None:
-			if cost.value > self.costFTOCP:
-				print('The cost is not decreasing at step %i' % abs_t)
-				print('This iteration: %g' % cost.value)
-				print('Last iteration: %g' % self.costFTOCP)
+		# if SS is not None:
+		# 	if cost.value > self.costFTOCP:
+		# 		print('The cost is not decreasing at step %i' % abs_t)
+		# 		print('This iteration: %g' % cost.value)
+		# 		print('Last iteration: %g' % self.costFTOCP)
 				# pdb.set_trace()
 
 			self.costFTOCP = cost.value

@@ -17,10 +17,12 @@ WORKDIR /home/LMPC
 RUN pip install --upgrade pip
 RUN pip install cython cysignals gmpy2==2.1.0b3
 RUN pip install numpy scipy matplotlib jupyterlab
-RUN pip install cvxpy pplpy 
+RUN pip install cvxpy pplpy
 RUN apt install -y libblas-dev
 RUN pip install ipopt
 RUN pip install casadi
+
+RUN apt install -y ffmpeg
 
 # Two options for command to run
 

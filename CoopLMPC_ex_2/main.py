@@ -4,14 +4,14 @@ import numpy as np
 import numpy.linalg as la
 import cvxpy as cp
 import scipy as sp
-import scipy.spatial
 import multiprocessing as mp
 
 import matplotlib
 matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 from matplotlib import rc
 rc('text', usetex=True)
+
+import matplotlib.pyplot as plt
 
 import os, sys, time, copy, pickle, itertools, pdb
 
@@ -121,9 +121,9 @@ def solve_lmpc(lmpc, x0, xf, expl_con=None, verbose=False, visualizer=None, paus
 	return xcl, ucl
 
 def main():
-	plot_dir = '/'.join((BASE_DIR, 'plots'))
-	if not os.path.exists(plot_dir):
-		os.makedirs(plot_dir)
+	out_dir = '/'.join((BASE_DIR, 'out'))
+	if not os.path.exists(out_dir):
+		os.makedirs(out_dir)
 
 	log_dir = '/'.join((BASE_DIR, 'logs'))
 	if not os.path.exists(log_dir):
@@ -142,7 +142,7 @@ def main():
 	n_x = 4
 	n_u = 2
 
-	r_a = [0.1, 0.2, 0.3] # Agents are circles with radius a_r
+	r_a = [0.1, 0.2, 0.3] # Agents are circles with radius r_a
 
 	# Define system dynamics and cost for each agent
 	A = [np.nan*np.ones((n_x, n_x)) for _ in range(n_a)]
@@ -260,30 +260,30 @@ def main():
 	xcls = [copy.copy(xcl_feas)]
 	ucls = [copy.copy(ucl_feas)]
 
-	totalIterations = 20 # Number of iterations to perform
+	totalIterations = 15 # Number of iterations to perform
 	start_time = time.strftime("%Y-%m-%d_%H-%M-%S")
-	exp_dir = '/'.join((plot_dir, start_time))
+	exp_dir = '/'.join((out_dir, start_time))
 	os.makedirs(exp_dir)
 
-	# Initialize objective plots
-	# obj_plot = plot_utils.updateable_plot(n_a, title='Agent Trajectory Costs', x_label='Iteration')
-	# delta_plot = plot_utils.updateable_ts(n_a, title='Deltas', x_label='Time', y_label=['Agent %i' % (i+1) for i in range(n_a)])
-	lmpc_vis = [utils.plot_utils.lmpc_visualizer(pos_dims=[0,1], n_state_dims=n_x, n_act_dims=n_u, agent_id=i, plot_lims=plot_lims) for i in range(n_a)]
+	# Initialize visualizer for each agent
+	# lmpc_vis = [utils.plot_utils.lmpc_visualizer(pos_dims=[0,1], n_state_dims=n_x, n_act_dims=n_u, agent_id=i, plot_lims=plot_lims) for i in range(n_a)]
+	lmpc_vis = [None for i in range(n_a)]
 
 	raw_input('Ready to run LMPC, press enter to continue...')
 
 	# run simulation
 	# iteration loop
 	for it in range(totalIterations):
+		print('****************** Iteration %i ******************' & (it+1))
+		f = utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims, save_dir=exp_dir, it=it)
+
 		for lv in lmpc_vis:
-			lv.update_prev_trajs(state_traj=xcls[-1], act_traj=ucls[-1])
+			if lv is not None:
+				lv.update_prev_trajs(state_traj=xcls[-1], act_traj=ucls[-1])
 
-		# ball_con = utils.utils.get_traj_ell_con(xcls[-1], xf, r_a=r_a) # Compute ball_con with last trajectory
-		lin_con = utils.utils.get_traj_lin_con(xcls[-1], xf, r_a=r_a)
-
-		f = utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims)
-		# pdb.set_trace()
-		f.savefig('/'.join((exp_dir, 'it_%i_trajs.png' % it)))
+		start = time.time()
+		# ball_con = utils.utils.get_traj_ell_con(xcls[-1], xf, r_a=r_a, tol=tol) # Compute lin_con with last trajectory
+		lin_con = utils.utils.get_traj_lin_con(xcls[-1], xf, r_a=r_a, tol=tol)
 
 		x_it = []
 		u_it = []
@@ -293,7 +293,8 @@ def main():
 
 			agent_dir = '/'.join((exp_dir, 'it_%i' % (it+1), 'agent_%i' % (i+1)))
 			os.makedirs(agent_dir)
-			lmpc_vis[i].set_plot_dir(agent_dir)
+			if lmpc_vis[i] is not None:
+				lmpc_vis[i].set_plot_dir(agent_dir)
 
 			expl_con = {'lin' : lin_con[i]}
 			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], expl_con = expl_con, visualizer=lmpc_vis[i], pause=pause_each_solve, tol=tol)
@@ -304,27 +305,16 @@ def main():
 
 		xcls.append(x_it)
 		ucls.append(u_it)
-	# =====================================================================================
+
+		end = time.time()
+		print('Time elapsed for iteration %i: %g s' % (it+1, end - start))
+
+		pickle.dump(lmpc, open('/'.join((exp_dir, 'it_%i.pkl' % (it+1))), 'wb'))
 
 
-	# ====================================================================================
-	# Compute optimal solution by solving a FTOCP with long horizon
-	# ====================================================================================
-	# N = 500 # Set a very long horizon to fake infinite time optimal control problem
-	# ftocp_opt = FTOCP(N, A, B, Q, R)
-	# ftocp_opt.solve(xcl[0])
-	# xOpt = ftocp_opt.xPred
-	# uOpt = ftocp_opt.uPred
-	# costOpt = lmpc.computeCost(xOpt.T.tolist(), uOpt.T.tolist())
-	# print "Optimal cost is: ", costOpt[0]
-	# # Store optimal solution in the lmpc object
-	# lmpc.optCost = costOpt[0]
-	# lmpc.xOpt    = xOpt
-
-	# Save the lmpc object
-	filename = '/'.join((log_dir, 'lmpc_object.pkl'))
-	filehandler = open(filename, 'w')
-	pickle.dump(lmpc, filehandler)
+	# Plot last trajectory
+	f = utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims, save_dir=exp_dir, it=totalIterations)
+	#=====================================================================================
 
 	plt.show()
 

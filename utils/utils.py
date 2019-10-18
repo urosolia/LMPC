@@ -37,11 +37,11 @@ def get_agent_polytopes(A, abs_t, xf_reached, r_a):
 				if i in rp:
 					rp_idx = np.argwhere(rp == i)[0][0]
 
-					tr_1 = max(0, xf_reached[i]-abs_t)/xf_reached[i] # ratio of remaining trajectory for current agent
-					tr_2 = max(0, xf_reached[rp[1-rp_idx]]-abs_t)/xf_reached[i] # ratio of remaining trajectory for neighbor agent
+					tr_1 = (xf_reached[i]-abs_t)/xf_reached[i] # ratio of remaining trajectory for current agent
+					tr_2 = (xf_reached[rp[1-rp_idx]]-abs_t)/xf_reached[i] # ratio of remaining trajectory for neighbor agent
 					# shifted sigmoid between 0 (small t_r) and 1 (large t_r)
-					w_1 = np.exp(35*tr_1-5)/(np.exp(35*tr_1-5)+1)
-					w_2 = np.exp(35*tr_2-5)/(np.exp(35*tr_2-5)+1)
+					w_1 = np.exp(35*tr_1+5)/(np.exp(35*tr_1+5)+1)
+					w_2 = np.exp(35*tr_2+5)/(np.exp(35*tr_2+5)+1)
 
 					v = [] # Vertices that define the ridge
 					p = [point, vor.points[rp[1-rp_idx]]] # Points that the ridge separates
@@ -50,8 +50,8 @@ def get_agent_polytopes(A, abs_t, xf_reached, r_a):
 							v.append(vor.vertices[rv[k]])
 
 					conn_vec_p = p[1] - p[0] # Vector from current point to second point
-					conn_vec_l = np.linalg.norm(conn_vec_p, 2) # Length of that vector
-					l =  conn_vec_l*(1+(w_1-w_2))/2 - r_a[i]
+					conn_vec_l = la.norm(conn_vec_p, 2) # Length of that vector
+					l = conn_vec_l*(1+(w_1-w_2))/2 - r_a[i]
 
 					# Find parameters a, b that describe the separating line (i.e. a'x + b = 0)
 					ridge_a = conn_vec_p
@@ -87,7 +87,7 @@ def get_agent_distances(A, abs_t, xf_reached, r_a):
 	"""
 	- A: agent states at abs_t (num_agents, dimension)
 	- abs_t: absolute timestep
-	- xf_reached: flags for agent trajectory completion (num_agents,)
+	- xf_reached: number of timesteps it took for each agent to reach its goal state (num_agents,)
 	- r_a: agent radius (num_agens,)
 	"""
 	n_a = A.shape[0]
@@ -200,6 +200,9 @@ def get_traj_lin_con(agent_xcls, xf, r_a=None, tol=-7):
 
 # A tool for inspecting the trajectory at an iteration, when this function is called, the program will enter into a while loop which waits for user input to inspect the trajectory
 def traj_inspector(visualizer, start_t, xcl, x_preds, u_preds, expl_con=None):
+	if visualizer is None:
+		return
+		
 	t = start_t
 
 	# Get the max time of the trajectory

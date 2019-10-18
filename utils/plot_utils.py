@@ -1,24 +1,28 @@
 import numpy as np
-import copy, pickle, pdb, time, sys
+import copy, pickle, pdb, time, sys, os
 
 import matplotlib
 matplotlib.use('TkAgg')
-# import matplotlib.font_manager
-# matplotlib.font_manager._rebuild()
-import matplotlib.pyplot as plt
 from matplotlib import rc
 rc('text', usetex=True)
 
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+
 # Trajectory animation with circular exploration constraints
-def plot_agent_trajs(x, ball_con=None, lin_con=None, r_a=None, trail=False, shade=False, plot_lims=None):
-	if lin_con is not None:
-		H_cl = lin_con[0]
-		g_cl = lin_con[1]
+def plot_agent_trajs(x, expl_con=None, r_a=None, trail=False, shade=False, plot_lims=None, save_dir=None, save_video=False, it=None):
+	dpi = 200
+
+	if expl_con is not None and 'lin' in expl_con:
+		H_cl = expl_con['lin'][0]
+		g_cl = expl_con['lin'][1]
 		boundary_x = np.linspace(plot_lims[0][0], plot_lims[0][1], 50)
 		if shade:
 			p1 = np.linspace(plot_lims[0][0], plot_lims[0][1], 10)
 			p2 = np.linspace(plot_lims[1][0], plot_lims[1][1], 10)
 			P1, P2 = np.meshgrid(p1, p2)
+	if expl_con is not None and 'ell' in expl_con:
+		ell_con = expl_con['ell']
 
 	n_a = len(x)
 
@@ -30,8 +34,12 @@ def plot_agent_trajs(x, ball_con=None, lin_con=None, r_a=None, trail=False, shad
 
 	c = [matplotlib.cm.get_cmap('jet')(i*(1./(n_a-1))) for i in range(n_a)]
 
+	if save_video:
+		imgs = []
+		fig_a = plt.figure(dpi=dpi)
+
 	plt.ion()
-	fig = plt.figure()
+	fig = plt.figure(dpi=dpi)
 	ax = fig.gca()
 	if plot_lims is not None:
 		ax.set_xlim(plot_lims[0])
@@ -40,6 +48,7 @@ def plot_agent_trajs(x, ball_con=None, lin_con=None, r_a=None, trail=False, shad
 	t = 0
 	text_vars = []
 	while not np.all(end_flags):
+		plt.figure(fig.number)
 		if len(text_vars) != 0:
 			for txt in text_vars:
 				txt.remove()
@@ -54,14 +63,20 @@ def plot_agent_trajs(x, ball_con=None, lin_con=None, r_a=None, trail=False, shad
 		for i in range(n_a):
 			plot_t = min(t, traj_lens[i]-1)
 			ax.plot(x[i][0,plot_t], x[i][1,plot_t], '.', c=c[i])
-			text_vars.append(ax.text(x[i][0,plot_t]+r_a[i]+0.05, x[i][1,plot_t]+r_a[i]+0.05, str(i+1), fontsize=12, bbox=dict(facecolor='white', alpha=1.)))
+			text_vars.append(ax.text(x[i][0,plot_t]+r_a[i]+0.05,
+				x[i][1,plot_t]+r_a[i]+0.05, str(i+1), fontsize=12,
+				bbox=dict(facecolor='white', alpha=1.)))
 			if r_a[i] > 0:
-				ax.plot(x[i][0,plot_t]+r_a[i]*np.cos(np.linspace(0,2*np.pi,100)), x[i][1,plot_t]+r_a[i]*np.sin(np.linspace(0,2*np.pi,100)), c=c[i])
+				ax.plot(x[i][0,plot_t]+r_a[i]*np.cos(np.linspace(0,2*np.pi,100)),
+					x[i][1,plot_t]+r_a[i]*np.sin(np.linspace(0,2*np.pi,100)),
+					c=c[i])
 				# ax.plot(x[i][0,plot_t]+l*np.array([-1, -1, 1, 1, -1]), x[i][1,plot_t]+l*np.array([-1, 1, 1, -1, -1]), c=c[i])
 
-			if ball_con is not None:
-				ax.plot(x[i][0,plot_t]+ball_con[i,t]*np.cos(np.linspace(0,2*np.pi,100)), x[i][1,plot_t]+ball_con[i,t]*np.sin(np.linspace(0,2*np.pi,100)), '--', c=c[i], linewidth=0.7)
-			if lin_con is not None:
+			if expl_con is not None and 'ell' in expl_con:
+				ax.plot(x[i][0,plot_t]+ell_con[i,t]*np.cos(np.linspace(0,2*np.pi,100)),
+					x[i][1,plot_t]+ell_con[i,t]*np.sin(np.linspace(0,2*np.pi,100)),
+					'--', c=c[i], linewidth=0.7)
+			if expl_con is not None and 'lin' in expl_con:
 				H = H_cl[i][t]
 				g = g_cl[i][t]
 				boundary_y = (-H[0,0]*boundary_x - g[0])/(H[0,1]+1e-10)
@@ -78,13 +93,32 @@ def plot_agent_trajs(x, ball_con=None, lin_con=None, r_a=None, trail=False, shad
 			if not end_flags[i] and t >= traj_lens[i]-1:
 				end_flags[i] = True
 
-		t += 1
+		if it is not None:
+			ax.set_title('Iteration: %i' % it)
 		ax.set_aspect('equal')
+
 		fig.canvas.draw()
-		time.sleep(0.02)
+		# time.sleep(0.02)
 		plt.ioff()
 
-	return fig
+		if save_video:
+			width, height = fig.get_size_inches() * fig.get_dpi()
+			img_arr = np.fromstring(fig.canvas.tostring_rgb(), dtype='uint8').reshape(int(height), int(width), 3)
+			plt.figure(fig_a.number)
+			img = plt.imshow(img_arr, animated=True)
+			plt.axis('off')
+			imgs.append([img])
+
+		t += 1
+
+	if save_video:
+		ani = animation.ArtistAnimation(fig_a, imgs, interval=50, blit=True)
+		ani.save('/'.join((save_dir, 'it_%i.mp4' % it)), dpi=dpi)
+
+	if save_dir is not None and not save_video:
+		fig.savefig('/'.join((save_dir, 'it_%i.png' % it)))
+
+	return fig, fig_a
 
 def plot_ts(x, title=None, x_label=None, y_labels=None):
 	plt.figure()
