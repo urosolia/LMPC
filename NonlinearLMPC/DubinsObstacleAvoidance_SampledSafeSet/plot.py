@@ -9,7 +9,7 @@ rc('text', usetex=True)
 
 it = 6
 iterationTime = []
-P = 8
+P = 10
 print "Number of points used: ", P
 # =========================================================
 # Plot closed-loop
@@ -20,7 +20,7 @@ colorMap = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#
 
 xFeasible = np.loadtxt('storedData/closedLoopFeasible.txt')
 plt.figure()
-plt.plot(xFeasible[0,:], xFeasible[1,:], '-dk', label='Feasible trajectory')
+plt.plot(xFeasible[0,:], xFeasible[1,:], '-d', color=colorMap[2], label='Feasible trajectory')
 iterationTime.append(xFeasible.shape[1]-1) # Store time to reach xf
 
 print xFeasible
@@ -54,8 +54,9 @@ plt.plot(x_obs, y_obs, '-k', label='Obstacle')
 plt.xlabel('$x$', fontsize=20)
 plt.ylabel('$y$', fontsize=20)
 
-plt.legend()
-
+plt.legend(loc = 'best')
+# plt.ylim(-10,50)
+# plt.xlim(-1,60)
 # =========================================================
 # Plot velocity and acceleration
 # =========================================================
@@ -105,11 +106,11 @@ ucl = np.loadtxt('storedData/inputIteration'+str(i)+'_P_'+str(P)+'.txt')
 plt.figure()
 
 plt.subplot(2, 1, 1)
-plt.plot(ucl[:,0], '-o')
+plt.plot(ucl[:,0], '-o', color=colorMap[0])
 plt.ylabel('$\mathrm{Steering}$', fontsize=20)
 
 plt.subplot(2, 1, 2)
-plt.plot(ucl[:,1], '-o')
+plt.plot(ucl[:,1], '-o', color=colorMap[0])
 plt.plot([0,ucl.shape[0]-1],[1,1], '--k', label='Saturation limit')
 plt.plot([0,ucl.shape[0]-1],[-1,-1], '--k')
 plt.xlabel('$\mathrm{Time~Step}$', fontsize=20)
