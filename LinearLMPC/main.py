@@ -18,7 +18,7 @@ def main():
 	print "Computing first feasible trajectory"
 	
 	# Initial Condition
-	x0 = [-9.0, 1.2];
+	x0 = [-15.0, 0.0];
 
 	# Initialize FTOCP object
 	N_feas = 10
@@ -53,12 +53,12 @@ def main():
 	# ====================================================================================
 
 	# Initialize LMPC object
-	N_LMPC = 4 # horizon length
+	N_LMPC = 3 # horizon length
 	ftocp = FTOCP(N_LMPC, A, B, Q, R) # ftocp solved by LMPC
 	lmpc = LMPC(ftocp, CVX=True) # Initialize the LMPC (decide if you wanna use the CVX hull)
 	lmpc.addTrajectory(xcl_feasible, ucl_feasible) # Add feasible trajectory to the safe set
 	
-	totalIterations = 10 # Number of iterations to perform
+	totalIterations = 20 # Number of iterations to perform
 
 	# run simulation
 	# iteration loop

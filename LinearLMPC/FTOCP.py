@@ -50,10 +50,10 @@ class FTOCP(object):
 		constr = [x[:,0] == x0[:]]
 		for i in range(0, self.N):
 			constr += [x[:,i+1] == self.A*x[:,i] + self.B*u[:,i],
-						u[:,i] >= -1.0,
-						u[:,i] <=  1.0,
-						x[:,i] >= -10.0,
-						x[:,i] <=  10.0,]
+						u[:,i] >= -5.0,
+						u[:,i] <=  5.0,
+						x[:,i] >= -15.0,
+						x[:,i] <=  15.0,]
 
 		# Terminal Constraint if SS not empty --> enforce the terminal constraint
 		if SS is not None:
