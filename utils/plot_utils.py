@@ -37,6 +37,8 @@ def plot_agent_trajs(x, expl_con=None, r_a=None, trail=False, shade=False, plot_
 	if save_video:
 		imgs = []
 		fig_a = plt.figure(dpi=dpi)
+	else:
+		fig_a = []
 
 	plt.ion()
 	fig = plt.figure(dpi=dpi)

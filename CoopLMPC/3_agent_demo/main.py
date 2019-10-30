@@ -2,8 +2,6 @@ from __future__ import division
 
 import numpy as np
 import numpy.linalg as la
-import cvxpy as cp
-import scipy as sp
 import multiprocessing as mp
 
 import matplotlib
@@ -17,7 +15,7 @@ import os, sys, time, copy, pickle, itertools, pdb
 
 os.environ['TZ'] = 'America/Los_Angeles'
 time.tzset()
-BASE_DIR = os.path.dirname('/'.join(str.split(os.path.realpath(__file__),'/')[:-1]))
+BASE_DIR = os.path.dirname('/'.join(str.split(os.path.realpath(__file__),'/')[:-2]))
 sys.path.append(BASE_DIR)
 
 from FTOCP_coop import FTOCP
@@ -274,8 +272,8 @@ def main():
 	# run simulation
 	# iteration loop
 	for it in range(totalIterations):
-		print('****************** Iteration %i ******************' & (it+1))
-		f = utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims, save_dir=exp_dir, it=it)
+		print('****************** Iteration %i ******************' % (it+1))
+		utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims, save_dir=exp_dir, it=it)
 
 		for lv in lmpc_vis:
 			if lv is not None:
@@ -290,14 +288,13 @@ def main():
 		# agent loop
 		for i in range(n_a):
 			print('Agent %i' % (i+1))
-
 			agent_dir = '/'.join((exp_dir, 'it_%i' % (it+1), 'agent_%i' % (i+1)))
 			os.makedirs(agent_dir)
 			if lmpc_vis[i] is not None:
 				lmpc_vis[i].set_plot_dir(agent_dir)
 
 			expl_con = {'lin' : lin_con[i]}
-			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], expl_con = expl_con, visualizer=lmpc_vis[i], pause=pause_each_solve, tol=tol)
+			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], expl_con=expl_con, visualizer=lmpc_vis[i], pause=pause_each_solve, tol=tol)
 			opt_cost = lmpc[i].addTrajectory(xcl, ucl)
 			# obj_plot.update(np.array([it, opt_cost]).T, i)
 			x_it.append(xcl)
@@ -311,9 +308,8 @@ def main():
 
 		pickle.dump(lmpc, open('/'.join((exp_dir, 'it_%i.pkl' % (it+1))), 'wb'))
 
-
 	# Plot last trajectory
-	f = utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims, save_dir=exp_dir, it=totalIterations)
+	utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims, save_dir=exp_dir, it=totalIterations)
 	#=====================================================================================
 
 	plt.show()

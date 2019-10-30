@@ -57,9 +57,9 @@ class LMPC(object):
 		# Finally flip the cost to have correct order
 		return np.flip(cost).tolist()
 
-	def solve(self, xt, xf=None, abs_t=None, ball_con=None, lin_con=None, verbose=True):
+	def solve(self, xt, xf=None, abs_t=None, expl_con=None, verbose=True):
 		# Solve the FTOCP. Here set terminal constraint = ConvHull(self.SS) and terminal cost = BarycentricInterpolation(self.Qfun)
-		return self.ftocp.solve(xt, xf=xf, abs_t=abs_t, ball_con=ball_con, lin_con=lin_con,
+		return self.ftocp.solve(xt, xf=xf, abs_t=abs_t, expl_con=expl_con,
 			SS=self.SS, Qfun=self.Qfun, CVX=self.CVX, verbose=verbose)
 
 	def get_safe_set_q_func(self):

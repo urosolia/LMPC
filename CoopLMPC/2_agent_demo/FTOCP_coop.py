@@ -135,7 +135,7 @@ class FTOCP(object):
 		cost = 0
 		for i in range(self.N):
 			if SS is not None:
-				cost += cp.quad_form(u[:,i], self.R)
+				cost += x[1,i]**2 + cp.quad_form(u[:,i], self.R)
 			else:
 				cost += cp.quad_form(x[:,i]-xf, self.Q) + cp.quad_form(u[:,i], self.R) # Running cost h(x,u) = x^TQx + u^TRu
 			if not CVX:
@@ -153,34 +153,19 @@ class FTOCP(object):
 		problem = cp.Problem(cp.Minimize(cost), constr)
 		problem.solve(verbose=verbose)
 
-		if problem.status != cp.OPTIMAL:
-			if problem.status == cp.INFEASIBLE:
-				print('Optimization was infeasible for step %i' % abs_t)
-			elif problem.status == cp.UNBOUNDED:
-				print('Optimization was unbounded for step %i' % abs_t)
-			elif problem.status == cp.INFEASIBLE_INACCURATE:
-				print('Optimization was infeasible inaccurate for step %i' % abs_t)
-			elif problem.status == cp.UNBOUNDED_INACCURATE:
-				print('Optimization was unbounded inaccurate for step %i' % abs_t)
-			elif problem.status == cp.OPTIMAL_INACCURATE:
-				print('Optimization was optimal inaccurate for step %i' % abs_t)
+		if problem.status == 'infeasible':
+			raise(ValueError('Optimization was infeasible for step %i' % abs_t))
+		elif problem.status == 'unbounded':
+			raise(ValueError('Optimization was unbounded for step %i' % abs_t))
 
-			pdb.set_trace()
-			return (None, None)
-
-		# if SS is not None:
-		# 	if cost.value > self.costFTOCP:
-		# 		print('The cost is not decreasing at step %i' % abs_t)
-		# 		print('This iteration: %g' % cost.value)
-		# 		print('Last iteration: %g' % self.costFTOCP)
+		if SS is not None:
+			if cost.value > self.costFTOCP:
+				print('The cost is not decreasing at step %i' % abs_t)
+				print('This iteration: %g' % cost.value)
+				print('Last iteration: %g' % self.costFTOCP)
 				# pdb.set_trace()
 
 			self.costFTOCP = cost.value
-
-		if x.value is None or u.value is None:
-			print('Optimization variables returned None')
-			print(problem.status)
-			pdb.set_trace()
 
 		return(x.value, u.value)
 
