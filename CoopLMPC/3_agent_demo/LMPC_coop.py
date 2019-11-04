@@ -2,8 +2,7 @@ from __future__ import division
 
 import numpy as np
 from numpy import linalg as la
-import pdb
-import copy
+import pdb, copy
 
 class LMPC(object):
 	"""Learning Model Predictive Controller (LMPC)

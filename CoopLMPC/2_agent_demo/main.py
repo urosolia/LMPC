@@ -2,22 +2,20 @@ from __future__ import division
 
 import numpy as np
 import numpy.linalg as la
-import cvxpy as cp
-import scipy as sp
-import scipy.spatial
 import multiprocessing as mp
 
 import matplotlib
 matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 from matplotlib import rc
 rc('text', usetex=True)
+
+import matplotlib.pyplot as plt
 
 import os, sys, time, copy, pickle, itertools, pdb
 
 os.environ['TZ'] = 'America/Los_Angeles'
 time.tzset()
-BASE_DIR = os.path.dirname('/'.join(str.split(os.path.realpath(__file__),'/')[:-1]))
+BASE_DIR = os.path.dirname('/'.join(str.split(os.path.realpath(__file__),'/')[:-2]))
 sys.path.append(BASE_DIR)
 
 from FTOCP_coop import FTOCP
@@ -68,21 +66,33 @@ def solve_init_traj(ftocp, x0, waypt, xf, tol=-7):
 
 	return (xcl_feas, ucl_feas)
 
-def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visualizer=None, pause=False, tol=-7):
+def solve_lmpc(lmpc, x0, xf, expl_con=None, verbose=False, visualizer=None, pause=False, tol=-7):
 	n_x = lmpc.ftocp.n
 	n_u = lmpc.ftocp.d
 
+	x_pred_log = []
+	u_pred_log = []
+
 	xcl = x0 # initialize system state at interation it
 	ucl = np.empty((n_u,0))
+
+	inspect = False
 
 	t = 0
 	# time Loop (Perform the task until close to the origin)
 	while True:
 		xt = xcl[:,t] # Read measurements
-		(x_pred, u_pred) = lmpc.solve(xt, xf=xf, abs_t=t, ball_con=ball_con, lin_con=lin_con, verbose=verbose) # Solve FTOCP
+		(x_pred, u_pred) = lmpc.solve(xt, xf=xf, abs_t=t, expl_con=expl_con, verbose=verbose) # Solve FTOCP
+		# Inspect incomplete trajectory
+		if x_pred is None or u_pred is None:
+			utils.utils.traj_inspector(visualizer, t, xcl, x_pred_log, u_pred_log, expl_con)
+			sys.exit()
+		else:
+			x_pred_log.append(x_pred)
+			u_pred_log.append(u_pred)
 
 		if visualizer is not None:
-			visualizer.plot_state_traj(xcl, x_pred, t, ball_con=ball_con, lin_con=lin_con, shade=True)
+			visualizer.plot_state_traj(xcl, x_pred, t, expl_con=expl_con, shade=True)
 			visualizer.plot_act_traj(ucl, u_pred, t)
 
 		# Read input and apply it to the system
@@ -101,9 +111,11 @@ def solve_lmpc(lmpc, x0, xf, ball_con=None, lin_con=None, verbose=False, visuali
 
 		t += 1
 
+	# Inspection mode after iteration completion
+	if inspect:
+		utils.utils.traj_inspector(visualizer, t, xcl, x_pred_log, u_pred_log, expl_con)
+
 	# print np.round(np.array(xcl).T, decimals=2) # Uncomment to print trajectory
-	# Add trajectory to update the safe set and value function
-	# lmpc.addTrajectory(xcl, ucl)
 	return xcl, ucl
 
 def main():
@@ -223,7 +235,7 @@ def main():
 	xcls = [copy.copy(xcl_feas)]
 	ucls = [copy.copy(ucl_feas)]
 
-	totalIterations = 20 # Number of iterations to perform
+	totalIterations = 15 # Number of iterations to perform
 	start_time = time.strftime("%Y-%m-%d_%H-%M-%S")
 	exp_dir = '/'.join((plot_dir, start_time))
 	os.makedirs(exp_dir)
@@ -237,26 +249,28 @@ def main():
 	# run simulation
 	# iteration loop
 	for it in range(totalIterations):
-		for lv in lmpc_vis:
-			lv.update_prev_trajs(state_traj=xcls[-1], act_traj=ucls[-1])
+		print('****************** Iteration %i ******************' % (it+1))
+		utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims, save_dir=exp_dir, it=it)
 
+		for lv in lmpc_vis:
+			if lv is not None:
+				lv.update_prev_trajs(state_traj=xcls[-1], act_traj=ucls[-1])
+
+		start = time.time()
 		# ball_con = utils.utils.get_traj_ball_con(xcls[-1], xf, r_a=r_a) # Compute ball_con with last trajectory
 		lin_con = utils.utils.get_traj_lin_con(xcls[-1], xf, r_a=r_a, tol=tol)
-
-		f = utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims)
-		f.savefig('/'.join((plot_dir, start_time, 'it_%i_trajs.png' % it)))
 
 		x_it = []
 		u_it = []
 		for i in range(n_a):
 			print('Agent %i' % (i+1))
-
 			agent_dir = '/'.join((exp_dir, 'it_%i' % (it+1), 'agent_%i' % (i+1)))
 			os.makedirs(agent_dir)
-			lmpc_vis[i].set_plot_dir(agent_dir)
+			if lmpc_vis[i] is not None:
+				lmpc_vis[i].set_plot_dir(agent_dir)
 
-			# (xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], ball_con=ball_con[i,:], visualizer=lmpc_vis[i], pause=pause_each_solve)
-			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], lin_con=lin_con[i], visualizer=lmpc_vis[i], pause=pause_each_solve, tol=tol)
+			expl_con = {'lin' : lin_con[i]}
+			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], expl_con=expl_con, visualizer=lmpc_vis[i], pause=pause_each_solve, tol=tol)
 			opt_cost = lmpc[i].addTrajectory(xcl, ucl)
 			# obj_plot.update(np.array([it, opt_cost]).T, i)
 			x_it.append(xcl)
@@ -264,26 +278,15 @@ def main():
 
 		xcls.append(x_it)
 		ucls.append(u_it)
+
+		end = time.time()
+		print('Time elapsed for iteration %i: %g s' % (it+1, end - start))
+
+		pickle.dump(lmpc, open('/'.join((exp_dir, 'it_%i.pkl' % (it+1))), 'wb'))
+
+	# Plot last trajectory
+	utils.plot_utils.plot_agent_trajs(xcls[-1], r_a=r_a, trail=True, plot_lims=plot_lims, save_dir=exp_dir, it=totalIterations)
 	# =====================================================================================
-
-	# ====================================================================================
-	# Compute optimal solution by solving a FTOCP with long horizon
-	# ====================================================================================
-	# N = 500 # Set a very long horizon to fake infinite time optimal control problem
-	# ftocp_opt = FTOCP(N, A, B, Q, R)
-	# ftocp_opt.solve(xcl[0])
-	# xOpt = ftocp_opt.xPred
-	# uOpt = ftocp_opt.uPred
-	# costOpt = lmpc.computeCost(xOpt.T.tolist(), uOpt.T.tolist())
-	# print "Optimal cost is: ", costOpt[0]
-	# # Store optimal solution in the lmpc object
-	# lmpc.optCost = costOpt[0]
-	# lmpc.xOpt    = xOpt
-
-	# Save the lmpc object
-	filename = '/'.join((log_dir, 'lmpc_object.pkl'))
-	filehandler = open(filename, 'w')
-	pickle.dump(lmpc, filehandler)
 
 	plt.show()
 

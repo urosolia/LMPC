@@ -62,6 +62,7 @@ def main():
 	plt.legend()
 	plt.xlabel('Iteration')
 	plt.ylabel('Cost')
+	fig_cost.savefig('/'.join((exp_dir, 'cost.png')))
 
 	plt.show()
 
