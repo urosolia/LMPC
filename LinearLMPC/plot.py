@@ -14,6 +14,28 @@ rc('text', usetex=True)
 filehandler = open('lmpc_object.pkl', 'r')
 lmpc = pickle.load(filehandler)
 
+# =========================================================
+# Plot closed-loop trajectories at iteration j
+# =========================================================
+it = 19
+plt.figure()
+xcl = np.array(lmpc.SS[0]).T
+plt.plot(xcl[0,:], xcl[1,:], 'sr', label='sampled Safe Set')
+for i in range(1,it-1):
+	xcl = np.array(lmpc.SS[i]).T
+	plt.plot(xcl[0,:], xcl[1,:], 'sr')
+
+i = it-1
+xcl = np.array(lmpc.SS[i]).T
+plt.plot(xcl[0,:], xcl[1,:], '-ob', label='LMPC closed-loop')
+plt.plot(lmpc.xOpt[0,:], lmpc.xOpt[1,:], '--*k', label='Optimal trajectory')
+plt.legend(fontsize=16)
+
+plt.xlabel('$x_1$', fontsize=20)
+plt.ylabel('$x_2$', fontsize=20)
+plt.xlim([-16,1])
+plt.ylim([-0.5,7])
+plt.show()
 
 # =========================================================
 # Plot closed-loop trajectories
