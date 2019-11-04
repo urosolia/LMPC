@@ -94,7 +94,6 @@ plt.ylabel('$x_{(2)}$', fontsize=20)
 plt.axis('equal')
 
 plt.legend()
-plt.show()
 
 xit = []
 for i in range(it-1,it):
@@ -141,6 +140,10 @@ plt.xlim(0,19)
 plt.ylim(0,6)
 
 
+# =========================================================
+# Plot input
+# =========================================================
+
 plt.figure()
 
 plt.subplot(2, 1, 1)	
@@ -149,6 +152,41 @@ plt.plot(ucl[:,0], '-o', color='C0', label="LMPC closed-loop for P = "+str(P))
 plt.ylabel('$\mathrm{Steering}$', fontsize=20)
 
 plt.legend()
+
+
+plt.subplot(2, 1, 2)
+ucl = np.loadtxt('storedData/inputIteration'+str(it)+'_P_'+str(P)+'.txt')
+plt.plot(ucl[:,1], '-o', color='C0')#, label="LMPC closed-loop for P = "+str(i)+", i="+str(l[counter]))
+
+plt.plot([0,ucl.shape[0]-1],[1,1], '--k', label='Saturation limit')
+plt.plot([0,ucl.shape[0]-1],[-1,-1], '--k')
+plt.xlabel('$\mathrm{Time~Step}$', fontsize=20)
+plt.ylabel('$\mathrm{Acceleration}$', fontsize=20)
+plt.legend()	
+
+plt.figure()
+mat = np.loadtxt('storedData/meanTimeLMPC'+'_P_'+str(P)+'.txt')
+compTime = mat[:,0].tolist()
+plt.plot(range(1,len(compTime)+1), compTime, '-o', label='${P =}$'+str(P))		
+
+plt.xlabel('$\mathrm{Iteration~}j$', fontsize=20)
+plt.ylabel('$\mathrm{Mean~Computational~Time~[s]}$', fontsize=20)
+plt.legend()
+
+# =========================================================
+# Plot input and velocity
+# =========================================================
+plt.figure()
+
+plt.subplot(2, 1, 1)	
+ucl = np.loadtxt('storedData/inputIteration'+str(it)+'_P_'+str(P)+'.txt')
+xcl = np.loadtxt('storedData/closedLoopIteration'+str(i)+'_P_'+str(P)+'.txt')
+
+plt.plot(xcl[:,2], '-o', color='C0', label="LMPC closed-loop for P = "+str(P))
+plt.ylabel('$\mathrm{Velocity}$', fontsize=20)
+
+plt.legend()
+
 
 plt.subplot(2, 1, 2)
 ucl = np.loadtxt('storedData/inputIteration'+str(it)+'_P_'+str(P)+'.txt')
