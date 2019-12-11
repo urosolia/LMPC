@@ -21,6 +21,7 @@ RUN pip install cvxpy pplpy
 RUN apt install -y libblas-dev
 RUN pip install ipopt
 RUN pip install casadi
+RUN pip install scikit-learn
 
 RUN apt install -y ffmpeg
 

@@ -11,10 +11,11 @@ rc('text', usetex=True)
 
 import matplotlib.pyplot as plt
 
-import os, sys, time, copy, pickle, itertools, pdb
+import os, sys, time, copy, pickle, itertools, pdb, argparse
 
 os.environ['TZ'] = 'America/Los_Angeles'
 time.tzset()
+FILE_DIR =  os.path.dirname('/'.join(str.split(os.path.realpath(__file__),'/')))
 BASE_DIR = os.path.dirname('/'.join(str.split(os.path.realpath(__file__),'/')[:-2]))
 sys.path.append(BASE_DIR)
 
@@ -119,6 +120,10 @@ def solve_lmpc(lmpc, x0, xf, expl_con=None, verbose=False, visualizer=None, paus
 	return xcl, ucl
 
 def main():
+	parser = argparse.ArgumentParser()
+	parser.add_argument('--init_traj', type=str, help='File containing the inital trajectory for each agent')
+	args = parser.parse_args()
+
 	out_dir = '/'.join((BASE_DIR, 'out'))
 	if not os.path.exists(out_dir):
 		os.makedirs(out_dir)
@@ -133,14 +138,18 @@ def main():
 	pause_each_solve = False # Pause on each FTOCP solution
 
 	plot_lims = [[-2.5, 2.5], [-2.5, 2.5]]
-	tol = -5
+	# tol = -5
+	tol = -3
 
-	# Number of agents
-	n_a = 3
-	n_x = 4
-	n_u = 2
+	n_a = 3 # Number of agents
+	n_x = 4 # State dimension
+	n_u = 2 # Input dimension
 
 	r_a = [0.1, 0.2, 0.3] # Agents are circles with radius r_a
+	occupied_space = {'type' : 'circle', 'params' : r_a}
+
+	# wh_a = [np.array([0.2,0.15]), np.array([0.2,0.15]), np.array([0.2,0.15])] # Agents are boxes with [width, height]
+	# occupied_space = {'type' : 'box', 'params' : wh_a}
 
 	# Define system dynamics and cost for each agent
 	A = [np.nan*np.ones((n_x, n_x)) for _ in range(n_a)]
@@ -182,65 +191,79 @@ def main():
 	if R.shape[0] != R.shape[1] or len(np.diag(R)) != n_u:
 		raise(ValueError('Q matrix not shaped properly'))
 
-	# ====================================================================================
-	# Run simulation to compute feasible solutions for all agents
-	# ====================================================================================
-	# Intermediate waypoint to ensure collision-free trajectory
-	# waypt = [np.array([[2, 1.5, 0, 0]]).T, np.array([[0, -1.5, 0, 0]]).T]
-	waypt = None
+	if args.init_traj is None:
+		# ====================================================================================
+		# Run simulation to compute feasible solutions for all agents
+		# ====================================================================================
+		# Intermediate waypoint to ensure collision-free trajectory
+		# waypt = [np.array([[2, 1.5, 0, 0]]).T, np.array([[0, -1.5, 0, 0]]).T]
+		waypt = None
 
-	xcl_feas = []
-	ucl_feas = []
+		xcl_feas = []
+		ucl_feas = []
 
-	# Initialize FTOCP objects
-	N_feas = 10
-	ftocp = [FTOCP(N_feas, A[i], B[i], 0.1*Q, R, Hx=Hx, gx=gx, Hu=Hu, gu=gu) for i in range(n_a)]
+		# Initialize FTOCP objects
+		N_feas = 10
+		ftocp = [FTOCP(N_feas, A[i], B[i], 0.1*Q, R, Hx=Hx, gx=gx, Hu=Hu, gu=gu) for i in range(n_a)]
 
-	start = time.time()
-	if parallel:
-		# Create threads
-		pool = mp.Pool(processes=n_a)
-		# Assign thread to agent trajectory
-		results = [pool.apply_async(solve_init_traj, args=(ftocp[i], x0[i], None, xf[i], tol)) for i in range(n_a)]
-		# Sync point
-		init_trajs = [r.get() for r in results]
+		start = time.time()
+		if parallel:
+			# Create threads
+			pool = mp.Pool(processes=n_a)
+			# Assign thread to agent trajectory
+			results = [pool.apply_async(solve_init_traj, args=(ftocp[i], x0[i], None, xf[i], tol)) for i in range(n_a)]
+			# Sync point
+			init_trajs = [r.get() for r in results]
 
-		(xcl_feas, ucl_feas) = zip(*init_trajs)
-		xcl_feas = list(xcl_feas)
-		ucl_feas = list(ucl_feas)
-	else:
+			(xcl_feas, ucl_feas) = zip(*init_trajs)
+			xcl_feas = list(xcl_feas)
+			ucl_feas = list(ucl_feas)
+		else:
+			for i in range(n_a):
+				(x, u) = solve_init_traj(ftocp[i], x0[i], None, xf[i], tol=tol)
+				xcl_feas.append(x)
+				ucl_feas.append(u)
+		end = time.time()
+
 		for i in range(n_a):
-			(x, u) = solve_init_traj(ftocp[i], x0[i], None, xf[i], tol=tol)
-			xcl_feas.append(x)
-			ucl_feas.append(u)
-	end = time.time()
+			xcl_feas[i] = np.append(xcl_feas[i], xf[i], axis=1)
+			ucl_feas[i] = np.append(ucl_feas[i], np.zeros((n_u,1)), axis=1)
 
-	for i in range(n_a):
-		xcl_feas[i] = np.append(xcl_feas[i], xf[i], axis=1)
-		ucl_feas[i] = np.append(ucl_feas[i], np.zeros((n_u,1)), axis=1)
+		# Shift agent trajectories in time so that they occur sequentially
+		# (no collisions)
+		xcl_lens = [xcl_feas[i].shape[1] for i in range(n_a)]
 
-	# Shift agent trajectories in time so that they occur sequentially
-	# (no collisions)
-	xcl_lens = [xcl_feas[i].shape[1] for i in range(n_a)]
+		for i in range(n_a):
+			before_len = 0
+			after_len = 0
+			for j in range(i):
+				before_len += xcl_lens[j]
+			for j in range(i+1, n_a):
+				after_len += xcl_lens[j]
 
-	for i in range(n_a):
-		before_len = 0
-		after_len = 0
-		for j in range(i):
-			before_len += xcl_lens[j]
-		for j in range(i+1, n_a):
-			after_len += xcl_lens[j]
+			xcl_feas[i] = np.hstack((np.tile(x0[i], before_len), xcl_feas[i], np.tile(xf[i], after_len)))
+			ucl_feas[i] = np.hstack((np.zeros((n_u, before_len)), ucl_feas[i], np.zeros((n_u, after_len))))
 
-		xcl_feas[i] = np.hstack((np.tile(x0[i], before_len), xcl_feas[i], np.tile(xf[i], after_len)))
-		ucl_feas[i] = np.hstack((np.zeros((n_u, before_len)), ucl_feas[i], np.zeros((n_u, after_len))))
+		# pdb.set_trace()
+
+		print('Time elapsed: %g s' % (end - start))
+
+		if plot_init:
+			plot_utils.plot_agent_trajs(xcl_feas, r=r_a, trail=True)
+
+		# Save initial trajecotry if file doesn't exist
+		if not os.path.exists('/'.join((FILE_DIR, 'init_traj.pkl'))):
+			print('Saving initial trajectory')
+			init_traj = {'x': xcl_feas, 'u' : ucl_feas}
+			pickle.dump(init_traj, open('/'.join((FILE_DIR, 'init_traj.pkl')), 'wb'))
+
+	else:
+		# Load initial trajectory from file
+		init_traj = pickle.load(open('/'.join((FILE_DIR, args.init_traj)), 'rb'))
+		xcl_feas = init_traj['x']
+		ucl_feas = init_traj['u']
 
 	# pdb.set_trace()
-
-	print('Time elapsed: %g s' % (end - start))
-
-	if plot_init:
-		plot_utils.plot_agent_trajs(xcl_feas, r=r_a, trail=True)
-
 	# ====================================================================================
 
 	# ====================================================================================
@@ -257,6 +280,8 @@ def main():
 
 	xcls = [copy.copy(xcl_feas)]
 	ucls = [copy.copy(ucl_feas)]
+
+	utils.utils.get_safe_set(xcls, xf, 50, 5, occupied_space)
 
 	totalIterations = 15 # Number of iterations to perform
 	start_time = time.strftime("%Y-%m-%d_%H-%M-%S")
