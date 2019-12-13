@@ -25,6 +25,8 @@ RUN pip install scikit-learn
 
 RUN apt install -y ffmpeg
 
+RUN pip install pypoman
+
 # Two options for command to run
 
 # Start jupyter notebook server

@@ -227,7 +227,7 @@ def main():
 
 		for i in range(n_a):
 			xcl_feas[i] = np.append(xcl_feas[i], xf[i], axis=1)
-			ucl_feas[i] = np.append(ucl_feas[i], np.zeros((n_u,1)), axis=1)
+			ucl_feas[i] = np.append(ucl_feas[i], np.zeros((n_u,2)), axis=1)
 
 		# Shift agent trajectories in time so that they occur sequentially
 		# (no collisions)
@@ -236,10 +236,14 @@ def main():
 		for i in range(n_a):
 			before_len = 0
 			after_len = 0
+			# for j in range(i):
+			# 	before_len += xcl_lens[j]
+			# for j in range(i+1, n_a):
+			# 	after_len += xcl_lens[j]
 			for j in range(i):
-				before_len += xcl_lens[j]
+				before_len += 5
 			for j in range(i+1, n_a):
-				after_len += xcl_lens[j]
+				after_len += 5
 
 			xcl_feas[i] = np.hstack((np.tile(x0[i], before_len), xcl_feas[i], np.tile(xf[i], after_len)))
 			ucl_feas[i] = np.hstack((np.zeros((n_u, before_len)), ucl_feas[i], np.zeros((n_u, after_len))))
@@ -274,14 +278,17 @@ def main():
 	N_LMPC = [6, 6, 6] # horizon lengths
 	ftocp_for_lmpc = [FTOCP(N_LMPC[i], A[i], B[i], Q, R, Hx=Hx, gx=gx, Hu=Hu, gu=gu) for i in range(n_a)]# ftocp solve by LMPC
 	lmpc = [LMPC(f, CVX=False) for f in ftocp_for_lmpc]# Initialize the LMPC decide if you wanna use the CVX hull
-	for i in range(n_a):
-		print('Agent %i' % (i+1))
-		lmpc[i].addTrajectory(xcl_feas[i], ucl_feas[i], xf[i]) # Add feasible trajectory to the safe set
 
 	xcls = [copy.copy(xcl_feas)]
 	ucls = [copy.copy(ucl_feas)]
 
-	utils.utils.get_safe_set(xcls, xf, 50, 5, occupied_space)
+	ss_idxs, expl_spaces = utils.utils.get_safe_set(xcls, xf, 10, 5, occupied_space)
+	for i in range(n_a):
+		print('Agent %i' % (i+1))
+		lmpc[i].add_safe_set(ss_idxs[i])
+		lmpc[i].addTrajectory(xcl_feas[i], ucl_feas[i], xf[i]) # Add feasible trajectory to the safe set
+
+	# pdb.set_trace()
 
 	totalIterations = 15 # Number of iterations to perform
 	start_time = time.strftime("%Y-%m-%d_%H-%M-%S")
@@ -306,7 +313,7 @@ def main():
 
 		start = time.time()
 		# ball_con = utils.utils.get_traj_ell_con(xcls[-1], xf, r_a=r_a, tol=tol) # Compute lin_con with last trajectory
-		lin_con = utils.utils.get_traj_lin_con(xcls[-1], xf, r_a=r_a, tol=tol)
+		# lin_con = utils.utils.get_traj_lin_con(xcls[-1], xf, r_a=r_a, tol=tol)
 
 		x_it = []
 		u_it = []
@@ -318,15 +325,22 @@ def main():
 			if lmpc_vis[i] is not None:
 				lmpc_vis[i].set_plot_dir(agent_dir)
 
-			expl_con = {'lin' : lin_con[i]}
+			# expl_con = {'lin' : lin_con[i]}
+			expl_con = {'lin' : expl_spaces[i]}
 			(xcl, ucl) = solve_lmpc(lmpc[i], x0[i], xf[i], expl_con=expl_con, visualizer=lmpc_vis[i], pause=pause_each_solve, tol=tol)
-			opt_cost = lmpc[i].addTrajectory(xcl, ucl)
+			# opt_cost = lmpc[i].addTrajectory(xcl, ucl)
 			# obj_plot.update(np.array([it, opt_cost]).T, i)
 			x_it.append(xcl)
 			u_it.append(ucl)
 
 		xcls.append(x_it)
 		ucls.append(u_it)
+
+		ss_idxs, expl_spaces = utils.utils.get_safe_set(xcls, xf, 10, 5, occupied_space)
+		for i in range(n_a):
+			print('Agent %i' % (i+1))
+			lmpc[i].add_safe_set(ss_idxs[i])
+			lmpc[i].addTrajectory(xcl_feas[i], ucl_feas[i], xf[i]) # Add feasible trajectory to the safe set
 
 		end = time.time()
 		print('Time elapsed for iteration %i: %g s' % (it+1, end - start))

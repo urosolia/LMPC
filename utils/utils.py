@@ -7,7 +7,7 @@ import scipy.spatial
 import cvxpy as cp
 import matplotlib.pyplot as plt
 from sklearn import svm
-import pdb, itertools, matplotlib
+import pdb, itertools, matplotlib, pypoman
 
 def get_agent_polytopes(A, abs_t, xf_reached, r_a):
 	# A is a matrix with rows equal to number of agents and columns equal to
@@ -245,8 +245,6 @@ def traj_inspector(visualizer, start_t, xcl, x_preds, u_preds, expl_con=None):
 			print('Press q to exit, f/b to move forward/backwards through iteration time steps')
 
 def get_safe_set(x_cls, xf, des_num_ts='all', des_num_iters='all', occupied_space=None):
-	num_ts = 0
-	num_iters = len(x_cls)
 	n_a = len(x_cls[0])
 	n_x = x_cls[0][0].shape[0]
 
@@ -256,24 +254,33 @@ def get_safe_set(x_cls, xf, des_num_ts='all', des_num_iters='all', occupied_spac
 	pairs = map(list, itertools.combinations(range(n_a), 2))
 	# Get the minimum distance for collision avoidance between agents based on the geometry of their occupied space
 	min_dist = []
+	r_a = np.zeros(n_a)
 	for p in pairs:
 		if occupied_space is not None:
 			if occupied_space['type'] == 'circle':
 				dist = occupied_space['params'][p[0]] + occupied_space['params'][p[1]]
+				r_a[p[0]] = occupied_space['params'][p[0]]
+				r_a[p[1]] = occupied_space['params'][p[1]]
 			elif occupied_space['type'] == 'box':
 				dist = la.norm(occupied_space['params'][p[0]],2) + la.norm(occupied_space['params'][p[1]],2) # Approximate with circle
+				r_a[p[0]] = la.norm(occupied_space['params'][p[0]],2)
+				r_a[p[1]] = la.norm(occupied_space['params'][p[1]],2)
 			else:
 				raise(ValueError('Occupied space type not recognized'))
 		else:
 			dist = 0
 		min_dist.append(dist)
 
+	num_ts = 0
+	num_iters = len(x_cls)
+	cl_lens = []
+
 	# Get the longest trajectory for all agents
 	for iter_cls in x_cls:
 		for agent_cl in iter_cls:
-			cl_len = agent_cl.shape[1]
-			if cl_len > num_ts:
-				num_ts = cl_len
+			cl_lens.append(agent_cl.shape[1])
+			if agent_cl.shape[1] > num_ts:
+				num_ts = agent_cl.shape[1]
 
 	# Set number of time steps to be included to the trajectory length if it was larger
 	if num_ts < des_num_ts:
@@ -284,68 +291,56 @@ def get_safe_set(x_cls, xf, des_num_ts='all', des_num_iters='all', occupied_spac
 	if des_num_ts == 'all':
 		des_num_ts = num_ts
 
-	# Safe sets in the form of nested lists [[SS_a0_t0, SS_a0_t1, ...], [SS_a1_t0, SS_a1_t1, ...]]
-	# SS_a#_t# is a numpy array where the rows correspond to the state dimensions,
-	# and the columns correspond to the points in the safe set
-	safe_sets = [[] for _ in range(n_a)]
-	it_t_ranges = []
+	safe_sets_idxs = [[] for _ in range(n_a)]
 	exploration_spaces = [[] for _ in range(n_a)]
 	last_invalid_t = -1
 
-	for t in range(num_ts):
+	for t in range(num_ts-1):
 		# Determine starting iteration index and ending time step index
 		it_start = max(0, num_iters-des_num_iters)
-		ts_end = min(num_ts, t+des_num_ts)
+		# ts_end = min(num_ts, t+des_num_ts)
+		ts_end = t+des_num_ts
+		H_cand_t = [[] for _ in range(n_a)]
+		g_cand_t = [[] for _ in range(n_a)]
 		while True:
 			# Construct candidate safe set
 			print('Constructing safe set from iteration %i to %i and time %i to %i' % (it_start, num_iters-1, t, ts_end-1))
-			safe_set_cand_t = [[] for _ in range(n_a)] # Candidate safe sets at this time step
+			safe_set_cand_t = []
 			for a in range(n_a):
-				for j in range(it_start, num_iters):
-					ss = x_cls[j][a][:,t:ts_end].reshape((n_x,ts_end-t)) # Grab trajectory segments for each iteration included in the safe set
-					safe_set_cand_t[a].append(ss)
-
-			# Debug plot
-			# plt.figure()
-			# for a in range(n_a):
-			# 	for j in range(num_iters):
-			# 		plt.plot(x_cls[j][a][0,:], x_cls[j][a][1,:], 'o', c=c[a])
-			# 	for j in range(it_start, num_iters):
-			# 		plt.plot(safe_set_cand_t[a][j][0,:], safe_set_cand_t[a][j][1,:], 'o', c=c[a], markersize=10, markerfacecolor='none')
-			# 		for i in range(safe_set_cand_t[a][j].shape[1]):
-			# 			plt.plot(safe_set_cand_t[a][j][0,i]+occupied_space['params'][a]*np.cos(np.linspace(0,2*np.pi,100)),
-			# 				safe_set_cand_t[a][j][1,i]+occupied_space['params'][a]*np.sin(np.linspace(0,2*np.pi,100)),
-			# 				c=c[a])
-			# plt.gca().set_aspect('equal')
-			# plt.show()
+				ss_idxs = {'it_range' : range(it_start, num_iters), 'ts_range' : range(min(t, cl_lens[a]-1), min(ts_end, cl_lens[a]))}
+				safe_set_cand_t.append(ss_idxs) # Candidate safe sets at this time step
 
 			# Check for potential overlap and minimum distance between agent safe sets
 			all_valid = True
 			for (p, d) in zip(pairs, min_dist):
 				collision = False
 				# Collision only defined for position states
-				safe_set_pos_0 = np.hstack(safe_set_cand_t[p[0]])
-				safe_set_pos_0 = safe_set_pos_0[:2].T
-				safe_set_pos_1 = np.hstack(safe_set_cand_t[p[1]])
-				safe_set_pos_1 = safe_set_pos_1[:2].T
+				safe_set_pos_0 = np.empty((2,0))
+				safe_set_pos_1 = np.empty((2,0))
+				for j in safe_set_cand_t[p[0]]['it_range']:
+					safe_set_pos_0 = np.append(safe_set_pos_0, x_cls[j][p[0]][:2,safe_set_cand_t[p[0]]['ts_range']], axis=1)
+					safe_set_pos_1 = np.append(safe_set_pos_1, x_cls[j][p[1]][:2,safe_set_cand_t[p[1]]['ts_range']], axis=1)
 
-				# Stack safe set position vectors into data matrix and assign labels
-				X = np.append(safe_set_pos_0, safe_set_pos_1, axis=0)
-				y = np.append(np.zeros(safe_set_pos_0.shape[0]), np.ones(safe_set_pos_1.shape[0]))
+				# Stack safe set position vectors into data matrix and assign labels agent p[0]: -1, agent p[1]: 1
+				X = np.append(safe_set_pos_0, safe_set_pos_1, axis=1).T
+				y = np.append(-np.ones(safe_set_pos_0.shape[1]), np.ones(safe_set_pos_1.shape[1]))
 
-				# Use SVM with linear kernel and no regularization (w'x + b <= 0 for agent p[0])
+				# if t == 68:
+				# 	pdb.set_trace()
+
+				# Use SVM with linear kernel and no regularization (w'x + b <= -a_0 for agent p[0], w'x + b >= a_1 for agent p[1])
 				clf = svm.SVC(kernel='linear', C=1000)
 				clf.fit(X, y)
-				w = clf.coef_
-				b = clf.intercept_
+				w = np.squeeze(clf.coef_)
+				b = np.squeeze(clf.intercept_)
+
 				# Calculate classifier margin
 				margin = 2/la.norm(w, 2)
-
-				# plot_svm_results(X, y, clf)
 
 				# Check for misclassification of support vectors. This indicates that the safe sets are not linearlly separable
 				for i in clf.support_:
 				    pred_label = clf.predict(X[i].reshape((1,-1)))
+					# pred_val = clf.decision_function(X[i].reshape((1,-1)))
 				    if pred_label != y[i]:
 						collision = True
 						print('Potential for collision between agents %i and %i' % (p[0],p[1]))
@@ -356,6 +351,7 @@ def get_safe_set(x_cls, xf, des_num_ts='all', des_num_iters='all', occupied_spac
 
 				# If collision is possible or margin is less than minimum required distance between safe sets, reduce safe set
 				# iteration and/or time range
+				# Currently, we reduce iteration range first. If iteration range cannot be reduced any further then we reduce time step range
 				if collision or margin < d:
 					all_valid = False
 					it_start += 1
@@ -366,43 +362,143 @@ def get_safe_set(x_cls, xf, des_num_ts='all', des_num_iters='all', occupied_spac
 					# Update the time step when a range reduction was last required, we will use this at the end to iterate through
 					# the safe sets up to this time and make sure that all safe sets use the same iteration and time range
 					last_invalid_t = t
+
+					# Reset the candidate exploration spaces
+					H_cand_t = [[] for _ in range(n_a)]
+					g_cand_t = [[] for _ in range(n_a)]
 					break
+
+				# Distance between hyperplanes is (a_0+a_1)/\|w\|
+				a_0_min = d*la.norm(w, 2)/(1 + r_a[p[1]]/r_a[p[0]])
+				a_1_min = d*la.norm(w, 2)/(1 + r_a[p[0]]/r_a[p[1]])
+
+				ratio_remain_0 = la.norm(x_cls[0][p[0]][:2,-1] - safe_set_pos_0[:,0], 2)/la.norm(x_cls[0][p[0]][:2,-1] - x_cls[0][p[0]][:2,0], 2)
+				ratio_remain_1 = la.norm(x_cls[0][p[1]][:2,-1] - safe_set_pos_1[:,0], 2)/la.norm(x_cls[0][p[1]][:2,-1] - x_cls[0][p[1]][:2,0], 2)
+				w_0 = np.exp(35*ratio_remain_0-3)/(np.exp(35*ratio_remain_0-3)+1)
+				w_1 = np.exp(35*ratio_remain_1-3)/(np.exp(35*ratio_remain_1-3)+1)
+
+				# Solve for tight hyperplane bounds for both collections of points
+				z = cp.Variable(1)
+				cost = z
+				constr = []
+				for i in range(safe_set_pos_0.shape[1]):
+					constr += [w.dot(safe_set_pos_0[:,i]) + b <= z]
+				problem = cp.Problem(cp.Minimize(cost), constr)
+				problem.solve(verbose=False)
+				a_0_max = -z.value[0]
+
+				z = cp.Variable(1)
+				cost = z
+				constr = []
+				for i in range(safe_set_pos_1.shape[1]):
+					constr += [-w.dot(safe_set_pos_1[:,i]) - b <= z]
+				problem = cp.Problem(cp.Minimize(cost), constr)
+				problem.solve(verbose=False)
+				a_1_max = -z.value[0]
+
+				if a_0_max > a_0_min and a_1_max > a_1_min:
+					if w_0 <= w_1:
+						a_shift = (a_0_max - a_0_min)*(1-w_0/w_1)
+						a_0 = a_0_min + a_shift
+						a_1 = a_1_min - a_shift
+					else:
+						a_shift = (a_1_max - a_1_min)*(1-w_1/w_0)
+						a_0 = a_0_min - a_shift
+						a_1 = a_1_min + a_shift
+				else:
+					a_0 = a_0_max - 1e-5 # Deal with precision issues when a point in the safe set is on the exploration space boundary
+					a_1 = a_1_max - 1e-5
+
+				# print('-------------------------')
+				# print(p)
+				# print(margin, d)
+				# print(w_0, a_0_min, a_0, a_0_max)
+				# print(w_1, a_1_min, a_1, a_1_max)
+				# if (t == 17):
+				# 	pdb.set_trace()
+
+				# Exploration spaces
+				H_cand_t[p[0]].append(w)
+				g_cand_t[p[0]].append(b+a_0)
+				H_cand_t[p[1]].append(-w)
+				g_cand_t[p[1]].append(-b+a_1)
+
+				# plot_svm_results(X, y, clf)
 
 			# all_valid flag is true if all pair-wise collision and margin checks were passed
 			if all_valid:
 				# Save iteration and time range from this time step, start with these values next time step
 				des_num_iters = num_iters - it_start
 				des_num_ts = ts_end - t
-				it_t_ranges.append({'n_it' : des_num_iters, 'n_t' : des_num_ts})
+				for a in range(n_a):
+					H_cand_t[a] = np.array(H_cand_t[a])
+					g_cand_t[a] = np.array(g_cand_t[a]).reshape((-1,1))
 				print('Safe set construction successful for t = %i, using iteration range %i and time range %i for next time step' % (t, des_num_iters, des_num_ts))
 				break # Break from while loop
 
-		for a in range(n_a):
-			safe_sets[a].append(safe_set_cand_t[a])
+		# Debug plot
+		# plt.figure()
+		# ax = plt.gca()
+		#
+		# for a in range(n_a):
+		# 	ss_cand = safe_set_cand_t[a]
+		# 	for j in range(num_iters):
+		# 		plt.plot(x_cls[j][a][0,:], x_cls[j][a][1,:], 'o', c=c[a])
+		# 	for j in ss_cand['it_range']:
+		# 		for i in ss_cand['ts_range']:
+		# 			plt.plot(x_cls[j][a][0,i]+occupied_space['params'][a]*np.cos(np.linspace(0,2*np.pi,100)),
+		# 				x_cls[j][a][1,i]+occupied_space['params'][a]*np.sin(np.linspace(0,2*np.pi,100)),
+		# 				c=c[a])
+		#
+		# 	xlim = np.array([-2.5, 2.5])
+		# 	ylim = [-1.5, 1.5]
+		# 	# xx = np.linspace(xlim[0], xlim[1], 30)
+		# 	# yy = np.linspace(ylim[0], ylim[1], 30)
+		# 	# YY, XX = np.meshgrid(yy, xx)
+		# 	# xy = np.vstack([XX.ravel(), YY.ravel()])
+		# 	#
+		# 	# z = (H_cand_t[a].dot(xy) + g_cand_t[a].reshape((-1,1)) <= 0)
+		# 	# z = z[0] & z[1]
+		# 	# true_idx = np.where(z)
+		# 	# plt.scatter(xy[0,true_idx], xy[1,true_idx], facecolors='none', c=c[a], s=5)
+		#
+		# 	y_0 = (-H_cand_t[a][0,0]*xlim-g_cand_t[a][0])/H_cand_t[a][0,1]
+		# 	y_1 = (-H_cand_t[a][1,0]*xlim-g_cand_t[a][1])/H_cand_t[a][1,1]
+		# 	plt.plot(xlim, y_0, c=c[a])
+		# 	plt.plot(xlim, y_1, c=c[a])
+		#
+		# ax.set_xlim(xlim)
+		# ax.set_ylim(ylim)
+		# ax.set_aspect('equal')
+		# plt.show()
+
 		# pdb.set_trace()
 
+		for a in range(n_a):
+			safe_sets_idxs[a].append(safe_set_cand_t[a])
+			exploration_spaces[a].append([H_cand_t[a], g_cand_t[a]])
+
 	# Adjust safe sets from before last_invalid_t to have the same iteration and time range
-	# and stack trajectory segments from all iterations into a single matrix
 	if last_invalid_t >= 0:
 		for t in range(last_invalid_t+1):
 			for a in range(n_a):
-				n_it = it_t_ranges[t]['n_it']
-				if n_it > des_num_iters:
-					for j in range(n_it-des_num_iters):
-						safe_sets[a][t].pop(0)
-				n_t = it_t_ranges[t]['n_t']
-				if n_t > des_num_ts:
-					for j in range(len(safe_sets[a][t])):
-						safe_sets[a][t][j] = safe_sets[a][t][j][:,:des_num_ts]
-				safe_sets[a][t] = np.hstack(safe_sets[a][t])
-	else:
-		for t in range(num_ts):
-			for a in range(n_a):
-				safe_sets[a][t] = np.hstack(safe_sets[a][t])
+				safe_sets_idxs[a][t]['it_range'] = safe_sets_idxs[a][last_invalid_t+1]['it_range'] # Update iteration range
+				safe_sets_idxs[a][t]['ts_range'] = safe_sets_idxs[a][t]['ts_range'][:des_num_ts] # Update time range
 
-	pdb.set_trace()
+	for t in range(num_ts-1):
+		for a in range(n_a):
+			if t <=  last_invalid_t:
+				safe_sets_idxs[a][t]['it_range'] = safe_sets_idxs[a][last_invalid_t+1]['it_range'] # Update iteration range
+				safe_sets_idxs[a][t]['ts_range'] = safe_sets_idxs[a][t]['ts_range'][:des_num_ts] # Update time range
 
-	return safe_sets, exploration_spaces
+			safe_set_pos = np.empty((2,0))
+			for j in safe_sets_idxs[a][t]['it_range']:
+				safe_set_pos = np.append(safe_set_pos, x_cls[j][a][:2,safe_sets_idxs[a][t]['ts_range']], axis=1)
+			in_exp_space = (exploration_spaces[a][t][0].dot(safe_set_pos) + exploration_spaces[a][t][1] <= 0)
+			if not np.all(in_exp_space):
+				raise(ValueError('Safe set not contained in exploration space at time %i' % t))
+
+	return safe_sets_idxs, exploration_spaces
 
 def plot_svm_results(X, y, clf):
 	plt.figure()
