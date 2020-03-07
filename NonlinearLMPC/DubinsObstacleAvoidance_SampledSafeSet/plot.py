@@ -172,7 +172,7 @@ if input == 'y':
 # =========================================================
 # Plot acceleration and velocities
 # =========================================================
-labelLMPC = 'LMPC from [21]'
+labelLMPC = 'LMPC from [26]'
 pltMarker = ['-o', '--s','-d','--v']
 if input == 'y':
 	i = it
