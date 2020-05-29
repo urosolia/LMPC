@@ -58,7 +58,8 @@ class FTOCP(object):
 		costSolved = []
 		soluSolved = []
 		slackNorm  = []
-		for i in range(0, self.N+1):
+		for i in range(0, self.N+1): 
+			# IMPORTANT: here 'i' represents the number of states constrained to the safe set --> the horizon length is (N-i)
 			if i is not self.N:
 				# Set box constraints on states (here we constraint the last i steps of the horizon to be xf)
 				self.lbx = x0 + [-100, -self.roadHalfWidth, -0]*(self.N-i)+ self.xf_lb.tolist()*i + [-2.0,-1.0]*self.N + [0]*self.dimSS  + [-10]*self.n
@@ -88,7 +89,7 @@ class FTOCP(object):
 					soluSolved.append(sol)
 					self.feasible = 0
 
-			else: # if horizon one time step just check feasibility of the initial guess
+			else: # if horizon one time step (because N-i = 0) --> just check feasibility of the initial guess
 				uGuess = self.xGuess[(self.n*(self.N+1)):(self.n*(self.N+1)+self.d)]
 				xNext  = self.f(x0, uGuess)
 				slackNorm.append(0.0)
