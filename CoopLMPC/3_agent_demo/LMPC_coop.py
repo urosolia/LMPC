@@ -4,6 +4,8 @@ import numpy as np
 from numpy import linalg as la
 import pdb, copy
 
+import utils.utils
+
 class LMPC(object):
 	"""Learning Model Predictive Controller (LMPC)
 	Inputs:
@@ -12,28 +14,56 @@ class LMPC(object):
 		- addTrajectory: adds a trajectory to the safe set SS and update value function
 		- computeCost: computes the cost associated with a feasible trajectory
 		- solve: uses ftocp and the stored data to comptute the predicted trajectory"""
-	def __init__(self, ftocp, CVX):
+	def __init__(self, ftocp, CVX=False):
 		# Initialization
 		self.ftocp = ftocp
-		self.SS    = []
-		self.uSS   = []
+		# self.SS    = []
+		# self.uSS   = []
 		self.Qfun  = []
+		self.SS_t = []
+		self.uSS_t = []
+		self.Qfun_t = []
+
 		self.Q = ftocp.Q
 		self.R = ftocp.R
 		self.it    = 0
 		self.CVX = CVX
 
+		self.x_cls = []
+		self.u_cls = []
+
+		self.ss_idxs = []
+
 	def addTrajectory(self, x, u, xf=None):
 		if xf is None:
 			xf = np.zeros((self.ftocp.n))
 
+		n_x = x.shape[0]
+		n_u = u.shape[0]
+
 		# Add the feasible trajectory x and the associated input sequence u to the safe set
-		self.SS.append(copy.copy(x))
-		self.uSS.append(copy.copy(u))
+		self.x_cls.append(copy.copy(x))
+		self.u_cls.append(copy.copy(u))
 
 		# Compute and store the cost associated with the feasible trajectory
-		cost = self.computeCost(x, u, xf)
+		cost = np.array(self.computeCost(x, u, xf))
 		self.Qfun.append(cost)
+
+		self.SS_t = []
+		self.uSS_t = []
+		self.Qfun_t = []
+		for t in range(len(self.ss_idxs)-1):
+			ss = np.empty((n_x,0))
+			uss = np.empty((n_u,0))
+			qfun = np.empty(0)
+			for j in self.ss_idxs[t]['it_range']:
+				ss = np.append(ss, self.x_cls[j][:,self.ss_idxs[t]['ts_range']], axis=1)
+				uss = np.append(uss, self.u_cls[j][:,self.ss_idxs[t]['ts_range']], axis=1)
+				qfun = np.append(qfun, self.Qfun[j][self.ss_idxs[t]['ts_range']])
+			self.SS_t.append(ss)
+			self.uSS_t.append(uss)
+			self.Qfun_t.append(qfun)
+
 		self.ftocp.costFTOCP = cost[0] + 0.1
 
 		# Augment iteration counter and print the cost of the trajectories stored in the safe set
@@ -52,7 +82,10 @@ class LMPC(object):
 				# cost = [10*x[1,t]**2]
 				cost = [0]
 			else:
-				cost.append(u[:,t].T.dot(self.R).dot(u[:,t]) + 1 + cost[-1])
+				if la.norm(x[:,t].reshape((-1,1))-xf,2) <= 1e-7:
+					cost.append(0)
+				else:
+					cost.append(u[:,t].T.dot(self.R).dot(u[:,t]) + 1 + cost[-1])
 		# Finally flip the cost to have correct order
 		return np.flip(cost).tolist()
 
@@ -63,3 +96,6 @@ class LMPC(object):
 
 	def get_safe_set_q_func(self):
 		return (self.SS, self.uSS, self.Qfun)
+
+	def add_safe_set(self, ss_idxs):
+		self.ss_idxs = ss_idxs
