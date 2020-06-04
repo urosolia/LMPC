@@ -21,24 +21,34 @@ def main():
 	ftocp = FTOCP(N=N,roadHalfWidth=roadHalfWidth) # ftocp used by LMPC
 	itMax = 10 # max number of itertions
 	itCounter = 1 # iteration counter 
-	x0 = [0, 0, 0] # initial condition
+	x0 = [[ 0.15,-0.1, 0],
+		  [ 0.1,  0.3, 0],
+		  [ 0.5,  0.5, 0],
+		  [0.25, 0.25, 0],
+		  [0.25,-0.25, 0],
+		  [ 0.0, 0.0, 0],
+		  [ 0.5, 0, 0],
+		  [ 0, 0.25, 0],
+		  [ 0.25, 0.0, 0],
+		  [ 0.15, 0.2, 0],] # initial condition
 
-
-	# Compute feasible trajectory
-	xclFeasible, uclFeasible = feasTraj(ftocp, 101, x0)
-	print np.round(xclFeasible, decimals=2)
-	np.savetxt('storedData/closedLoopFeasible.txt',xclFeasible.T, fmt='%f' )
-	np.savetxt('storedData/inputFeasible.txt',uclFeasible.T, fmt='%f' )
 
 	# Initialize LMPC object
-	# lmpc = LMPC(ftocp, l=10, P = 200, verbose = False)
-	# lmpc = LMPC(ftocp, l=4, P = 50, verbose = False)
-	lmpc = LMPC(ftocp, l=3, P = 20, verbose = False)
-	# lmpc = LMPC(ftocp, l=1, P = 15, verbose = False) 
+	lmpc = LMPC(ftocp, l=6, P = 20, verbose = False)
 
- 	# Add feasible trajectory to the safe set
-	lmpc.addTrajectory(xclFeasible, uclFeasible)
 
+	xit = []
+	P = 200;
+	for i in range(1,8):
+		xcl = np.loadtxt('storedData/closedLoopIteration'+str(i)+'_P_'+str(P)+'.txt')
+		ucl = np.loadtxt('storedData/inputIteration'+str(i)+'_P_'+str(P)+'.txt')
+		xcl = np.array(xcl).T
+		ucl = np.array(ucl).T
+		# Add feasible trajectory to the safe set
+		lmpc.addTrajectory(xcl, ucl)
+
+	xclFeasible = xcl
+	
 	# Pick terminal state or terminal set
 	terminalSet = True
 	if terminalSet == False:
@@ -57,18 +67,21 @@ def main():
 		lmpc.Xf_vertices = Xf_vertices
 		print "Verices Xf"	
 		print Xf_vertices
-	
-	# Iteration loop
+
+
 	meanTimeCostLMPC = []
-	while itCounter <= itMax:
+	for idxIC in range(0, len(x0)):
 		time = 0
 		itFlag = 0
 		xcl = [x0]
 		ucl = []
 		timeLMPC = []
-		# Time loop
+
+		xcl = [x0[idxIC]]
+		print('x0: ', xcl)
 		while (itFlag == 0):
 			xt = xcl[time] # read measurement
+			print("Time: ", time, " xt: ", xt)
 
 			startTimer = datetime.datetime.now()
 			lmpc.solve(xt, verbose = 1) # solve LMPC
@@ -109,46 +122,34 @@ def main():
 		print "++++++===============================================++++++"
 		print "Completed Iteration: ", itCounter
 		print "++++++===============================================++++++"
-		np.savetxt('storedData/closedLoopIteration'+str(itCounter)+'_P_'+str(lmpc.P)+'.txt', np.round(np.array(xcl), decimals=5).T, fmt='%f' )
-		np.savetxt('storedData/inputIteration'+str(itCounter)+'_P_'+str(lmpc.P)+'.txt', np.round(np.array(ucl), decimals=5).T, fmt='%f' )
-		np.savetxt('storedData/meanTimeLMPC_P_'+str(lmpc.P)+'.txt', np.array(meanTimeCostLMPC), fmt='%f' )
+		np.savetxt('storedData/closedLoopIteration'+str(itCounter)+'_P_'+str(lmpc.P)+'_IC.txt', np.round(np.array(xcl), decimals=5).T, fmt='%f' )
+		np.savetxt('storedData/inputIteration'+str(itCounter)+'_P_'+str(lmpc.P)+'_IC.txt', np.round(np.array(ucl), decimals=5).T, fmt='%f' )
+		np.savetxt('storedData/meanTimeLMPC_P_'+str(lmpc.P)+'_IC.txt', np.array(meanTimeCostLMPC), fmt='%f' )
 		np.save(outfile, xcl)
 
 		itCounter += 1 # increment iteration counter
 	
 
 
-def feasTraj(ftocp, timeSteps,x0):
+def feasTraj(ftocp, timeSteps, x0):
 	# Compute first feasible trajectory
 
 	# Intial condition
 	xcl = [np.array(x0)]
 	ucl =[]
-	u = [0,0]
-	radius = ftocp.radius
+	u = [0]
 
 	# Simple brute force hard coded if logic
 	for i in range(0, timeSteps):
 		if i ==0:
-			u[1] =  0.25
-		elif i== 1:
-			u[1] =   0.25
-		elif i== 2:
-			u[1] =   0.25
-		elif i==(timeSteps-4):
-			u[1] =  -0.25
-		elif i==(timeSteps-3):
-			u[1] =  -0.25
-		elif i==(timeSteps-2):
-			u[1] =  -0.25
+			u[0] =  0.5
+		elif xcl[-1][0] + ftocp.dt*xcl[-1][1] == 0:
+			u[0] = -xcl[-1][1]/(ftocp.dt*(1-(xcl[-1][1]/ ftocp.maxV)**2) )
 		else:
-			u[1] = 0   
+			u[0] = 0   
 		
-		u[0] =  xcl[-1][0] / radius;
-
 		xcl.append(ftocp.f(xcl[-1], u))
 		ucl.append(np.array(u))
-
 
 	return np.array(xcl).T[:,:-1], np.array(ucl).T[:,:-1]
 
