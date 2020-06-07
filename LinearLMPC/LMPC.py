@@ -38,8 +38,8 @@ class LMPC(object):
 
 		# Augment iteration counter and print the cost of the trajectories stored in the safe set
 		self.it = self.it + 1
-		print "Trajectory added to the Safe Set. Current Iteration: ", self.it
-		print "Performance stored trajectories: \n", [self.Qfun[i][0] for i in range(0, self.it)]
+		print("Trajectory added to the Safe Set. Current Iteration: ", self.it)
+		print("Performance stored trajectories: \n", [self.Qfun[i][0] for i in range(0, self.it)])
 
 	def computeCost(self, x, u):
 		# Compute the cost in a DP like strategy: start from the last point x[len(x)-1] and move backwards

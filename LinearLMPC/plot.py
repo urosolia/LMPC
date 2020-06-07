@@ -11,7 +11,7 @@ from matplotlib import rc
 # rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=True)
 
-filehandler = open('lmpc_object.pkl', 'r')
+filehandler = open('lmpc_object.pkl', 'rb')
 lmpc = pickle.load(filehandler)
 
 # =========================================================
@@ -90,6 +90,6 @@ plt.plot([0, it-1], [lmpc.optCost, lmpc.optCost], '--k', label='Optimal cost')
 plt.xlabel('$\mathrm{Iteration}$', fontsize=20)
 plt.legend(fontsize=16)
 
-print "Percentage deviation: ", np.abs((lmpc.optCost-totCost[-1])/lmpc.optCost)*100
+print("Percentage deviation: ", np.abs((lmpc.optCost-totCost[-1])/lmpc.optCost)*100)
 
 plt.show()

@@ -15,7 +15,7 @@ def main():
 	Q = np.diag([1.0, 1.0]) #np.eye(2)
 	R = 1.0#np.array([[1]])
 
-	print "Computing first feasible trajectory"
+	print("Computing first feasible trajectory")
 	
 	# Initial Condition
 	x0 = [-15.0, 0.0];
@@ -44,8 +44,8 @@ def main():
 		xcl_feasible.append(ftocp_for_mpc.model(xcl_feasible[time], ut))
 		time += 1
 
-	print np.round(np.array(xcl_feasible).T, decimals=2)
-	print np.round(np.array(ucl_feasible).T, decimals=2)
+	print(np.round(np.array(xcl_feasible).T, decimals=2))
+	print(np.round(np.array(ucl_feasible).T, decimals=2))
 	# ====================================================================================
 
 	# ====================================================================================
@@ -62,7 +62,7 @@ def main():
 
 	# run simulation
 	# iteration loop
-	print "Starting LMPC"
+	print("Starting LMPC")
 	for it in range(0,totalIterations):
 		# Set initial condition at each iteration
 		xcl = [x0] 
@@ -99,14 +99,14 @@ def main():
 	xOpt = ftocp_opt.xPred
 	uOpt = ftocp_opt.uPred
 	costOpt = lmpc.computeCost(xOpt.T.tolist(), uOpt.T.tolist())
-	print "Optimal cost is: ", costOpt[0]
+	print("Optimal cost is: ", costOpt[0])
 	# Store optimal solution in the lmpc object
 	lmpc.optCost = costOpt[0]
 	lmpc.xOpt    = xOpt
 
 	# Save the lmpc object
 	filename = 'lmpc_object.pkl'
-	filehandler = open(filename, 'w')
+	filehandler = open(filename, 'wb')
 	pickle.dump(lmpc, filehandler)
 
 if __name__== "__main__":
