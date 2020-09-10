@@ -1,6 +1,6 @@
 # LMPC Examples
 
-This repo collects a few LMPC examples.
+This repo collects a few LMPC examples. For more details please check the README file in the example folders
 
 ## Native/VirtualEnv Installation
 
