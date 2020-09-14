@@ -1,6 +1,11 @@
 # LMPC Examples
 
-This repo collects a few LMPC examples. For more details please check the README file in the example folders
+This repo collects a few LMPC examples. In particular we implemented:
+- The linear LMPC to solve the constrainted linear quadratic regulator (folder LinearMPC)
+- The nonlinear LMPC to solve nonlinear constrainted minimum time problems and simple racing problems (folder Nonlinear LMPC). 
+- The decentralized nonlinaer LMPC for cooperative control of dinamically decoupled systems coupled by feasibility constraints (folder CoopLMPC)
+
+For more details please check the README file in each folder
 
 ## Native/VirtualEnv Installation
 
