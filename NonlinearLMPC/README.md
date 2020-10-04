@@ -4,7 +4,7 @@ This folder contains two implementations of the LMPC for nonlinear minimum time 
 
 ## Mixed Integer Formulation
 
-Tolder "SafeSetQfunction_MixedIntegerFormulation" contains a LMPC implementation which uses either the time-varying sampled safe set [1], the local sampled safe set [2] or the sampled safe set [3]. At each time step, the control action is computed after solving a mixed integer nonlinear programming. The algorthm handles the integer variables and uses IPOPT to solve the nonlinear programming. More details on the strategy used to handle the integer variables can be found in [3, Section V.2)].
+The folder "SafeSetQfunction_MixedIntegerFormulation" contains a LMPC implementation which uses either the time-varying sampled safe set [1], the local sampled safe set [2] or the sampled safe set [3]. At each time step, the control action is computed after solving a mixed integer nonlinear programming. The algorthm handles the integer variables and uses IPOPT to solve the nonlinear programming. More details on the strategy used to handle the integer variables can be found in [3, Section V.2)].
 
 ## Nonlinear Formulation
 
