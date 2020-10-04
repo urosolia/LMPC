@@ -12,7 +12,7 @@ The folder "SafeSetQfunction_NonlinearFormulation" contains a LMPC implementatio
 
 ## References 
 
-[1] Ugo Rosolia and Francesco Borrelli. "Nonlinear  Learning  Model  Predictive  Control  for Time  Optimal  Control  Problems" submitted (Available soon).
+[1] Ugo Rosolia and Francesco Borrelli. "Nonlinear  Learning  Model  Predictive  Control  for Time  Optimal  Control  Problems" to appear in International Journal of Robust and Nonlinear Control [PDF](https://arxiv.org/abs/1911.09239).
 
 [2] Ugo Rosolia. "Learning Model Predictive Control: Theory and Application." PhD Thesis (Available soon).
 
