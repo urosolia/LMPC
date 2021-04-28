@@ -29,7 +29,7 @@ class FTOCP(object):
 		self.uPred = []
 
 	def solve(self, x0, verbose = False, SS = None, Qfun = None, CVX = None):
-		"""This methos solve a FTOCP given:
+		"""This method solves an FTOCP given:
 			- x0: initial condition
 			- SS: (optional) contains a set of state and the terminal constraint is ConvHull(SS)
 			- Qfun: (optional) cost associtated with the state stored in SS. Terminal cost is BarycentrcInterpolation(SS, Qfun)
