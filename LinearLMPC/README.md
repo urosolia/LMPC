@@ -6,7 +6,7 @@ This code runs the LMPC from [1] and [2] to solve the following Contratined LQR 
 <img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/readmeFigures/CLQR.png" width="500" />
 </p>
 
-The LMPC will improve the closed-loop performance, unitl the closed-loop trajectory converges to a steady state behavior. This state state closed-loop trajectory is the unique gloabl optimal solution to above control problem, if some the technical conditions hold. For more details we refer to [1].
+The LMPC will improve the closed-loop performance, unitl the closed-loop trajectory converges to a steady state behavior. This steady state closed-loop trajectory is the unique gloabl optimal solution to above control problem, if some the technical conditions hold. For more details we refer to [1].
 <p align="center">
 <img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/readmeFigures/closed-loop.png" width="420" />
 <img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/readmeFigures/costImprovement.png" width="420" />
