@@ -1,12 +1,12 @@
 # Linear LMPC
 
-This code runs the LMPC from [1] and [2] to solve the following Contratined LQR problem
+This code runs the LMPC from [1] and [2] to solve the following constrainted LQR problem:
 
 <p align="center">
 <img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/readmeFigures/CLQR.png" width="500" />
 </p>
 
-The LMPC will improve the closed-loop performance, unitl the closed-loop trajectory converges to a steady state behavior. This steady state closed-loop trajectory is the unique gloabl optimal solution to above control problem, if some the technical conditions hold. For more details we refer to [1].
+The LMPC improves the closed-loop performance until the closed-loop trajectory converges to a steady-state behavior. In this example, the controller iteratively improves the performance until the closed-loop trajectory converges to the unique global optimal solution to the above infinite time constrained LQR problem. For more details we refer to [1].
 <p align="center">
 <img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/readmeFigures/closed-loop.png" width="420" />
 <img src="https://github.com/urosolia/LMPC/blob/master/LinearLMPC/readmeFigures/costImprovement.png" width="420" />
