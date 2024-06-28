@@ -63,20 +63,25 @@ def plot_agent_trajs(x, expl_con=None, r_a=None, trail=False, shade=False, plot_
 				ax.set_ylim(plot_lims[1])
 
 		for i in range(n_a):
-			plot_t = min(t, traj_lens[i]-1)
-			ax.plot(x[i][0,plot_t], x[i][1,plot_t], '.', c=c[i])
-			text_vars.append(ax.text(x[i][0,plot_t]+r_a[i]+0.05,
-				x[i][1,plot_t]+r_a[i]+0.05, str(i+1), fontsize=12,
-				bbox=dict(facecolor='white', alpha=1.)))
-			if r_a[i] > 0:
-				ax.plot(x[i][0,plot_t]+r_a[i]*np.cos(np.linspace(0,2*np.pi,100)),
-					x[i][1,plot_t]+r_a[i]*np.sin(np.linspace(0,2*np.pi,100)),
-					c=c[i])
-				# ax.plot(x[i][0,plot_t]+l*np.array([-1, -1, 1, 1, -1]), x[i][1,plot_t]+l*np.array([-1, 1, 1, -1, -1]), c=c[i])
+			# plot_t = min(t, traj_lens[i]-1)
+			if t <= traj_lens[i]-1:
+				ax.plot(x[i][0,t], x[i][1,t], '.', c=c[i])
+				text_vars.append(ax.text(x[i][0,t]+r_a[i]+0.05,
+					x[i][1,t]+r_a[i]+0.05, str(i+1), fontsize=12,
+					bbox=dict(facecolor='white', alpha=1.)))
+				if r_a[i] > 0:
+					ax.plot(x[i][0,t]+r_a[i]*np.cos(np.linspace(0,2*np.pi,100)),
+						x[i][1,t]+r_a[i]*np.sin(np.linspace(0,2*np.pi,100)),
+						c=c[i])
+			else:
+				text_vars.append(ax.text(x[i][0,-1]+r_a[i]+0.05,
+					x[i][1,-1]+r_a[i]+0.05, str(i+1), fontsize=12,
+					bbox=dict(facecolor='white', alpha=1.)))
+					# ax.plot(x[i][0,t]+l*np.array([-1, -1, 1, 1, -1]), x[i][1,t]+l*np.array([-1, 1, 1, -1, -1]), c=c[i])
 
 			if expl_con is not None and 'ell' in expl_con:
-				ax.plot(x[i][0,plot_t]+ell_con[i,t]*np.cos(np.linspace(0,2*np.pi,100)),
-					x[i][1,plot_t]+ell_con[i,t]*np.sin(np.linspace(0,2*np.pi,100)),
+				ax.plot(x[i][0,t]+ell_con[i,t]*np.cos(np.linspace(0,2*np.pi,100)),
+					x[i][1,t]+ell_con[i,t]*np.sin(np.linspace(0,2*np.pi,100)),
 					'--', c=c[i], linewidth=0.7)
 			if expl_con is not None and 'lin' in expl_con:
 				H = H_cl[i][t]

@@ -25,7 +25,9 @@ RUN pip install scikit-learn
 
 RUN apt install -y ffmpeg
 
-RUN pip install pypoman
+RUN pip install -f https://download.mosek.com/stable/wheel/index.html Mosek
+RUN mkdir /root/mosek
+COPY mosek.lic /root/mosek
 
 # Two options for command to run
 

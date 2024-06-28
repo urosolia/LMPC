@@ -21,6 +21,8 @@ sys.path.append(BASE_DIR)
 
 from FTOCP_coop import FTOCP
 from LMPC_coop import LMPC
+from agents import Kin_Bike_Agent
+
 import utils.plot_utils
 import utils.utils
 
@@ -141,33 +143,14 @@ def main():
 	tol = -5
 	# tol = -3
 
+	dt = 0.01
 	n_a = 3 # Number of agents
 	n_x = 4 # State dimension
 	n_u = 2 # Input dimension
 
-	r_a = [0.1, 0.2, 0.3] # Agents are circles with radius r_a
-	occupied_space = {'type' : 'circle', 'params' : r_a}
-
-	# wh_a = [np.array([0.2,0.15]), np.array([0.2,0.15]), np.array([0.2,0.15])] # Agents are boxes with [width, height]
-	# occupied_space = {'type' : 'box', 'params' : wh_a}
-
-	# Define system dynamics and cost for each agent
-	A = [np.nan*np.ones((n_x, n_x)) for _ in range(n_a)]
-	B = [np.nan*np.ones((n_x, n_u)) for _ in range(n_a)]
-	A[0] = np.array([[1, 0, 0.2, 0],[0, 1, 0, 0.2], [0, 0, 1, 0], [0, 0, 0, 1]])
-	A[1] = np.array([[1, 0, 0.2, 0],[0, 1, 0, 0.2], [0, 0, 1, 0], [0, 0, 0, 1]])
-	A[2] = np.array([[1, 0, 0.2, 0],[0, 1, 0, 0.2], [0, 0, 1, 0], [0, 0, 0, 1]])
-	B[0] = np.array([[0, 0], [0, 0], [0.2, 0], [0, 0.2]])
-	B[1] = np.array([[0, 0], [0, 0], [0.2, 0], [0, 0.2]])
-	B[2] = np.array([[0, 0], [0, 0], [0.2, 0], [0, 0.2]])
-	Q = np.diag([1.0, 1.0, 1.0, 1.0]) #np.eye(2)
-	R = np.diag([0.1, 0.1]) #np.array([[1]])
-
-	# Linear inequalities
-	Hx = 1.*np.vstack((np.eye(n_x), -np.eye(n_x)))
-	gx = 10.*np.ones((2*n_x))
-	Hu = 1.*np.vstack((np.eye(n_u), -np.eye(n_u)))
-	gu = 2.*np.ones((2*n_u))
+	l_r = 0.2
+	l_f = 0.2
+	w = 0.2
 
 	# Initial Condition
 	x0 = [np.nan*np.ones((n_x, 1)) for _ in range(n_a)]
@@ -181,9 +164,19 @@ def main():
 	xf[1] = np.array([[-1, -1, 0, 0]]).T
 	xf[2] = np.array([[-2, 0, 0, 0]]).T
 
+	agents = [Kin_Bike_Agent(l_r, l_f, w, dt, x_0[i], x_f[i]) for i in range(n_a)]
+
+	r_a = [agents[i].get_collision_buff_r() for i in range(n_a)] # Agents are circles with radius r_a
+	occupied_space = {'type' : 'circle', 'params' : r_a}
+
+	# wh_a = [np.array([0.2,0.15]), np.array([0.2,0.15]), np.array([0.2,0.15])] # Agents are boxes with [width, height]
+	# occupied_space = {'type' : 'box', 'params' : wh_a}
+
+	# Define cost for each agent
+	Q = np.diag([1.0, 1.0, 1.0, 1.0]) #np.eye(2)
+	R = np.diag([0.1, 0.1]) #np.array([[1]])
+
 	# Check to make sure all agent dynamics, inital, and goal states have been defined
-	if np.any(np.isnan(A)) or np.any(np.isnan(B)):
-		raise(ValueError('A or B matricies have nan values'))
 	if np.any(np.isnan(x0)) or np.any(np.isnan(xf)):
 		raise(ValueError('Initial or goal states have empty entries'))
 	if Q.shape[0] != Q.shape[1] or len(np.diag(Q)) != n_x:
